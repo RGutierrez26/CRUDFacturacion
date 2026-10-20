@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sistema de Facturación</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div class="app-wrapper">
+      <!-- Barra superior con Título y Botón Agregar Factura -->
+      <header class="app-header">
+        <div class="header-left">
+          <h1>Gestión de Facturación</h1>
+          <p class="subtitle">Panel de control y reportes de comprobantes</p>
+        </div>
+        <div class="header-right">
+          <button id="btn-nueva-factura" class="btn btn-primary">
+            + Agregar Factura
+          </button>
+        </div>
+      </header>
+
+      <!-- Caja Principal de Contenido -->
+      <main class="main-card">
+        <!-- Sub-box: Filtros del Reporte -->
+        <section class="filters-section">
+          <div class="section-title">
+            <h3>Filtros de Búsqueda</h3>
+          </div>
+          <form id="form-filtros" class="filters-form">
+            <div class="form-group">
+              <label for="filtro-fecha-desde">Fecha Desde</label>
+              <input type="date" id="filtro-fecha-desde" name="fechaDesde" />
+            </div>
+
+            <div class="form-group">
+              <label for="filtro-fecha-hasta">Fecha Hasta</label>
+              <input type="date" id="filtro-fecha-hasta" name="fechaHasta" />
+            </div>
+
+            <div class="form-group">
+              <label for="filtro-estado">Estado</label>
+              <select id="filtro-estado" name="estado">
+                <option value="">Todos los Estados</option>
+                <option value="EMITIDA">Emitida</option>
+                <option value="PAGADA">Pagada</option>
+                <option value="ANULADA">Anulada</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="filtro-monto-minimo">Monto Mínimo ($)</label>
+              <input type="number" id="filtro-monto-minimo" name="montoMinimo" placeholder="Ej: 50000" min="0" step="any" />
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" id="btn-buscar" class="btn btn-search">
+                Buscar
+              </button>
+              <button type="button" id="btn-resetear" class="btn btn-secondary">
+                Resetear
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <!-- Sub-box: Tabla de Comprobantes -->
+        <section class="table-section">
+          <div class="section-header">
+            <h3>Comprobantes Emitidos</h3>
+            <span id="contador-facturas" class="badge">Cargando...</span>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>N° Factura</th>
+                  <th>Fecha Emisión</th>
+                  <th>Cliente</th>
+                  <th>Condición IVA</th>
+                  <th>Punto de Venta</th>
+                  <th class="text-right">Total</th>
+                  <th class="text-center">Ítems</th>
+                  <th class="text-center">Estado</th>
+                  <th class="text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-facturas-body">
+                <tr>
+                  <td colspan="9" class="text-center py-4">Cargando facturas...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- Modal Popup para Revisar Detalle de Factura -->
+    <div id="modal-detalle" class="modal-overlay hidden">
+      <div class="modal-content">
+        <header class="modal-header">
+          <h2 id="modal-titulo">Detalle de Factura</h2>
+          <button id="modal-btn-cerrar" class="btn-close">&times;</button>
+        </header>
+        <div id="modal-body" class="modal-body">
+          Cargando datos de la factura...
+        </div>
+        <footer class="modal-footer">
+          <button id="modal-btn-cerrar-footer" class="btn btn-secondary">Cerrar</button>
+        </footer>
+      </div>
+    </div>
+
+    <!-- Modal Popup para Modificar Factura -->
+    <div id="modal-editar" class="modal-overlay hidden">
+      <div class="modal-content modal-content-lg">
+        <header class="modal-header">
+          <h2 id="modal-editar-titulo">Modificar Factura</h2>
+          <button type="button" id="modal-editar-btn-cerrar" class="btn-close">&times;</button>
+        </header>
+        <form id="form-editar-factura">
+          <div id="modal-editar-body" class="modal-body">
+            Cargando datos de la factura...
+          </div>
+          <footer class="modal-footer" style="gap: 0.75rem;">
+            <button type="button" id="modal-editar-btn-cancelar" class="btn btn-secondary">Cancelar</button>
+            <button type="submit" id="modal-editar-btn-guardar" class="btn btn-primary">Guardar Cambios</button>
+          </footer>
+        </form>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
