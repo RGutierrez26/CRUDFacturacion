@@ -35,3 +35,16 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Credenciales y Claves Fiscales AFIP / ARCA ###
+*.key
+*.crt
+*.csr
+ticket-*.properties
+
+### Configuraciones y Secretos Locales ###
+src/main/resources/application-local.yaml
+src/main/resources/application-local.yml
+src/main/resources/application-local.properties
+.env
+

@@ -1,0 +1,13 @@
+# Ejemplo de configuracion local para desarrollo
+# Copia este archivo como "application-local.yaml" y completa con tus datos locales.
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/facturacion
+    username: tu_usuario_postgres
+    password: tu_password_postgres
+
+afip:
+  cuit: tu_cuit_homologacion
+  cert-path: ruta_a_tu_certificado.crt
+  key-path: ruta_a_tu_clave_privada.key

@@ -1,10 +1,12 @@
 spring:
   application:
     name: TpGrupal
+  config:
+    import: "optional:application-local.yaml"
   datasource:
-    url: jdbc:postgresql://aws-0-us-east-1.pooler.supabase.com:5432/postgres?currentSchema=facturacion&sslmode=require
-    username:
-    password:
+    url: ${DB_URL:}
+    username: ${DB_USERNAME:}
+    password: ${DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -14,3 +16,11 @@ spring:
       hibernate:
         format_sql: true
         default-schema: facturacion
+
+afip:
+  cuit: ${AFIP_CUIT:}
+  cert-path: ${AFIP_CERT_PATH:certificado_test.crt}
+  key-path: ${AFIP_KEY_PATH:privada_test.key}
+  homologacion: true
+  wsaa-url: https://wsaahomo.afip.gov.ar/ws/services/LoginCms
+  wsfe-url: https://wswhomo.afip.gov.ar/wsfev1/service.asmx
