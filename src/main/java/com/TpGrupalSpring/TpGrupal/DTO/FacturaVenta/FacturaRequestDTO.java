@@ -8,9 +8,7 @@ public record FacturaRequestDTO(
         Long clienteId,
         Long condicionIvaId,
         Long tipoMonedaId,
-        Long numero,
         Date fechaEmision,
-        String estado,
         String observaciones,
         Long usuarioCargaId,
         List<FacturaDetalleRequestDTO> detalles

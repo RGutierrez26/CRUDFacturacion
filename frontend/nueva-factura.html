@@ -13,7 +13,7 @@
       <header class="app-header">
         <div class="header-left">
           <h1>Nueva Factura de Venta</h1>
-          <p class="subtitle">Emisión y registro de nuevo comprobante comercial</p>
+          <p class="subtitle">Emisión y registro de comprobante comercial con selección y verificación modal</p>
         </div>
         <div class="header-right">
           <a href="/index.html" class="btn btn-secondary">
@@ -24,49 +24,79 @@
 
       <form id="form-nueva-factura">
         <main class="main-card">
-          <!-- 1. Box: Datos de Cabecera de la Factura -->
+          <!-- 1. Box: Atributos de Cabecera mediante Botones y Tarjetas de Selección -->
           <section class="filters-section">
             <div class="section-title">
-              <h3>Datos de Cabecera</h3>
+              <h3>Datos de Cabecera de la Factura</h3>
             </div>
             
-            <div class="form-grid-3">
-              <div class="form-group">
-                <label for="select-punto-venta">Punto de Venta *</label>
-                <select id="select-punto-venta" required>
-                  <option value="">Cargando puntos de venta...</option>
-                </select>
+            <div class="entity-cards-grid">
+              <!-- Tarjeta: Punto de Venta -->
+              <div class="entity-select-card" id="card-punto-venta">
+                <div class="entity-card-header">
+                  <span class="entity-card-label">Punto de Venta *</span>
+                  <span id="badge-punto-venta" class="entity-card-badge badge-empty">Pendiente</span>
+                </div>
+                <div class="entity-card-body">
+                  <div id="card-punto-venta-desc" class="entity-card-title">Sin seleccionar</div>
+                  <div id="card-punto-venta-sub" class="entity-card-subtitle">Elija el punto de emisión comercial</div>
+                </div>
+                <button type="button" id="btn-select-punto-venta" class="btn btn-secondary entity-card-btn">
+                  Seleccionar Punto de Venta
+                </button>
               </div>
 
-              <div class="form-group">
-                <label for="numero-factura">Número de Factura *</label>
-                <input type="number" id="numero-factura" placeholder="Ej: 1001" min="1" required />
+              <!-- Tarjeta: Cliente -->
+              <div class="entity-select-card" id="card-cliente">
+                <div class="entity-card-header">
+                  <span class="entity-card-label">Cliente</span>
+                  <span id="badge-cliente" class="entity-card-badge badge-selected">Consumidor Final</span>
+                </div>
+                <div class="entity-card-body">
+                  <div id="card-cliente-desc" class="entity-card-title">Consumidor Final</div>
+                  <div id="card-cliente-sub" class="entity-card-subtitle">Sin CUIT/CUIL asociado</div>
+                </div>
+                <button type="button" id="btn-select-cliente" class="btn btn-secondary entity-card-btn">
+                  Seleccionar Cliente
+                </button>
               </div>
 
+              <!-- Tarjeta: Condición IVA -->
+              <div class="entity-select-card" id="card-condicion-iva">
+                <div class="entity-card-header">
+                  <span class="entity-card-label">Condición IVA *</span>
+                  <span id="badge-condicion-iva" class="entity-card-badge badge-empty">Pendiente</span>
+                </div>
+                <div class="entity-card-body">
+                  <div id="card-condicion-iva-desc" class="entity-card-title">Sin seleccionar</div>
+                  <div id="card-condicion-iva-sub" class="entity-card-subtitle">Elija la condición fiscal del comprobante</div>
+                </div>
+                <button type="button" id="btn-select-condicion-iva" class="btn btn-secondary entity-card-btn">
+                  Seleccionar Condición IVA
+                </button>
+              </div>
+
+              <!-- Tarjeta: Tipo de Moneda -->
+              <div class="entity-select-card" id="card-tipo-moneda">
+                <div class="entity-card-header">
+                  <span class="entity-card-label">Tipo de Moneda *</span>
+                  <span id="badge-tipo-moneda" class="entity-card-badge badge-empty">Pendiente</span>
+                </div>
+                <div class="entity-card-body">
+                  <div id="card-tipo-moneda-desc" class="entity-card-title">Sin seleccionar</div>
+                  <div id="card-tipo-moneda-sub" class="entity-card-subtitle">Elija la moneda de facturación</div>
+                </div>
+                <button type="button" id="btn-select-tipo-moneda" class="btn btn-secondary entity-card-btn">
+                  Seleccionar Moneda
+                </button>
+              </div>
+            </div>
+
+            <!-- Parámetros Numéricos y Fechas de Cabecera -->
+            <div class="form-grid-3" style="margin-top: 1.25rem;">
               <div class="form-group">
                 <label for="fecha-emision">Fecha de Emisión *</label>
                 <input type="date" id="fecha-emision" required />
-              </div>
-
-              <div class="form-group">
-                <label for="select-cliente">Cliente</label>
-                <select id="select-cliente">
-                  <option value="">Consumidor Final</option>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label for="select-condicion-iva">Condición IVA *</label>
-                <select id="select-condicion-iva" required>
-                  <option value="">Cargando condiciones IVA...</option>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label for="select-tipo-moneda">Tipo de Moneda *</label>
-                <select id="select-tipo-moneda" required>
-                  <option value="">Cargando monedas...</option>
-                </select>
               </div>
 
               <div class="form-group span-full">
@@ -76,43 +106,72 @@
             </div>
           </section>
 
-          <!-- 2. Box: Agregar Productos y Renglones (Detalles) -->
+          <!-- 2. Box: Detalle de Ítems (Pre-selección obligatoria de Lista de Precios) -->
           <section class="filters-section">
             <div class="section-title">
-              <h3>Agregar Ítems a la Factura</h3>
+              <h3>Renglones y Detalle de Factura</h3>
             </div>
 
-            <!-- Formulario de carga de un ítem (Adaptable y cómodo) -->
-            <div class="add-item-card">
-              <div class="add-item-row-top">
-                <div class="form-group">
-                  <label for="select-producto">Artículo / Producto *</label>
-                  <select id="select-producto">
-                    <option value="">Seleccione un artículo...</option>
-                  </select>
+            <!-- Tarjeta de Selección de Lista de Precios -->
+            <div class="entity-cards-grid" style="grid-template-columns: 1fr; margin-bottom: 1rem;">
+              <div class="entity-select-card" id="card-lista-precio" style="max-width: 600px;">
+                <div class="entity-card-header">
+                  <span class="entity-card-label">Lista de Precios Previa *</span>
+                  <span id="badge-lista-precio" class="entity-card-badge badge-empty">Requerida</span>
                 </div>
-
-                <div class="form-group">
-                  <label for="input-precio">Precio Unitario ($)</label>
-                  <input type="number" id="input-precio" placeholder="0.00" readonly tabindex="-1" style="background-color: #ffffff; cursor: not-allowed;" title="Precio fijado automáticamente por la lista de precios" />
+                <div class="entity-card-body">
+                  <div id="card-lista-precio-desc" class="entity-card-title">Ninguna lista seleccionada</div>
+                  <div id="card-lista-precio-sub" class="entity-card-subtitle">
+                    Debe seleccionar primero una Lista de Precios para habilitar los productos asociados.
+                  </div>
                 </div>
+                <button type="button" id="btn-select-lista-precio" class="btn btn-primary entity-card-btn" style="max-width: 280px;">
+                  Seleccionar Lista de Precios
+                </button>
               </div>
+            </div>
 
-              <div class="add-item-row-bottom">
-                <div class="form-group">
-                  <label for="input-cantidad">Cantidad *</label>
-                  <input type="number" id="input-cantidad" min="1" step="any" value="1" />
+            <!-- Cartel / Banner informativo si no hay Lista de Precios seleccionada -->
+            <div id="banner-lista-precio" class="banner-warning">
+              <span>Para agregar artículos a la factura, primero debe seleccionar una Lista de Precios en el botón superior.</span>
+            </div>
+
+            <!-- Contenedor para Agregar Ítems (Habilitado sólo con Lista de Precios elegida) -->
+            <div id="seccion-carga-items" class="hidden" style="margin-top: 1rem;">
+              <div class="add-item-card">
+                <div class="add-item-row-top">
+                  <div class="form-group" style="flex: 2;">
+                    <label>Artículo de la Lista Seleccionada *</label>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                      <input type="text" id="input-articulo-preview" placeholder="Ningún artículo seleccionado" readonly style="background-color: #ffffff; cursor: pointer; font-weight: 600;" />
+                      <button type="button" id="btn-select-articulo" class="btn btn-secondary" style="white-space: nowrap; height: 38px;">
+                        Buscar Artículo
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="form-group" style="flex: 1;">
+                    <label for="input-precio">Precio Unitario ($)</label>
+                    <input type="number" id="input-precio" placeholder="0.00" readonly tabindex="-1" style="background-color: #ffffff; cursor: not-allowed; font-weight: 700; color: var(--primary);" title="Precio fijado por la lista de precios seleccionada" />
+                  </div>
                 </div>
 
-                <div class="form-group">
-                  <label for="input-bonificacion">% Bonif. (Desc.)</label>
-                  <input type="number" id="input-bonificacion" min="0" max="100" step="any" value="0" />
-                </div>
+                <div class="add-item-row-bottom">
+                  <div class="form-group">
+                    <label for="input-cantidad">Cantidad *</label>
+                    <input type="number" id="input-cantidad" min="1" step="any" value="1" />
+                  </div>
 
-                <div class="form-actions-inline">
-                  <button type="button" id="btn-agregar-item" class="btn btn-primary" style="height: 38px; width: 100%;">
-                    + Agregar Renglón
-                  </button>
+                  <div class="form-group">
+                    <label for="input-bonificacion">% Bonif. (Desc.)</label>
+                    <input type="number" id="input-bonificacion" min="0" max="100" step="any" value="0" />
+                  </div>
+
+                  <div class="form-actions-inline">
+                    <button type="button" id="btn-agregar-item" class="btn btn-primary" style="height: 38px; width: 100%;">
+                      + Agregar Renglón
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -169,6 +228,54 @@
           </footer>
         </main>
       </form>
+    </div>
+
+    <!-- Modal Popup Reutilizable para Selección y Verificación Completa -->
+    <div id="modal-selector" class="modal-overlay hidden">
+      <div class="modal-content modal-content-lg">
+        <header class="modal-header">
+          <h2 id="modal-selector-titulo">Seleccionar</h2>
+          <button type="button" id="modal-selector-btn-cerrar" class="btn-close">&times;</button>
+        </header>
+        <div class="modal-body">
+          <div class="form-group" style="margin-bottom: 0.85rem;">
+            <input type="text" id="modal-selector-busqueda" placeholder="Buscar por código, nombre o descripción..." autocomplete="off" />
+          </div>
+          <div class="selector-split-view">
+            <!-- Panel Izquierdo: Lista scrollable -->
+            <div class="selector-list-pane" id="modal-selector-lista">
+              <!-- Elementos generados por TS -->
+            </div>
+            <!-- Panel Derecho: Vista previa y verificación -->
+            <div class="selector-preview-pane">
+              <div class="preview-header">
+                <span>Verificación de Datos Completos</span>
+                <span id="modal-selector-preview-badge" class="badge">Detalle</span>
+              </div>
+              <div id="modal-selector-preview-content" class="preview-grid">
+                <p style="color: var(--text-muted); text-align: center; padding: 2rem 0;">
+                  Haga clic en un elemento de la lista para ver su información completa antes de confirmar.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <footer class="modal-footer">
+          <div class="modal-actions-bar">
+            <div class="modal-actions-left">
+              <button type="button" id="modal-selector-btn-opcional" class="btn btn-secondary hidden">
+                Sin Cliente (Consumidor Final)
+              </button>
+            </div>
+            <div class="modal-actions-right">
+              <button type="button" id="modal-selector-btn-cancelar" class="btn btn-secondary">Cancelar</button>
+              <button type="button" id="modal-selector-btn-aceptar" class="btn btn-primary" disabled>
+                Aceptar y Seleccionar
+              </button>
+            </div>
+          </div>
+        </footer>
+      </div>
     </div>
 
     <script type="module" src="/src/nuevaFactura.ts"></script>

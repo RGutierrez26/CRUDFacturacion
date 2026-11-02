@@ -44,6 +44,7 @@
               <label for="filtro-estado">Estado</label>
               <select id="filtro-estado" name="estado">
                 <option value="">Todos los Estados</option>
+                <option value="PENDIENTE">Pendiente</option>
                 <option value="EMITIDA">Emitida</option>
                 <option value="PAGADA">Pagada</option>
                 <option value="ANULADA">Anulada</option>
@@ -73,6 +74,20 @@
             <span id="contador-facturas" class="badge">Cargando...</span>
           </div>
 
+          <!-- Barra de Paginación Superior -->
+          <div id="paginacion-contenedor-top" class="pagination-container pagination-top">
+            <div class="pagination-info">
+              Mostrando <strong id="pag-desde-top">0</strong> - <strong id="pag-hasta-top">0</strong> de <strong id="pag-total-top">0</strong> comprobantes
+            </div>
+            <div class="pagination-controls">
+              <button id="btn-pag-primera-top" class="btn-pag" title="Primera página" disabled>&laquo;</button>
+              <button id="btn-pag-anterior-top" class="btn-pag" title="Página anterior" disabled>&lsaquo; Anterior</button>
+              <span id="pag-indicador-top" class="pagination-indicator">Página 1 de 1</span>
+              <button id="btn-pag-siguiente-top" class="btn-pag" title="Página siguiente" disabled>Siguiente &rsaquo;</button>
+              <button id="btn-pag-ultima-top" class="btn-pag" title="Última página" disabled>&raquo;</button>
+            </div>
+          </div>
+
           <div class="table-responsive">
             <table class="data-table">
               <thead>
@@ -94,6 +109,20 @@
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <!-- Barra de Paginación del Backend -->
+          <div id="paginacion-contenedor" class="pagination-container">
+            <div class="pagination-info">
+              Mostrando <strong id="pag-desde">0</strong> - <strong id="pag-hasta">0</strong> de <strong id="pag-total">0</strong> comprobantes
+            </div>
+            <div class="pagination-controls">
+              <button id="btn-pag-primera" class="btn-pag" title="Primera página" disabled>&laquo;</button>
+              <button id="btn-pag-anterior" class="btn-pag" title="Página anterior" disabled>&lsaquo; Anterior</button>
+              <span id="pag-indicador" class="pagination-indicator">Página 1 de 1</span>
+              <button id="btn-pag-siguiente" class="btn-pag" title="Página siguiente" disabled>Siguiente &rsaquo;</button>
+              <button id="btn-pag-ultima" class="btn-pag" title="Última página" disabled>&raquo;</button>
+            </div>
           </div>
         </section>
       </main>
@@ -126,9 +155,21 @@
           <div id="modal-editar-body" class="modal-body">
             Cargando datos de la factura...
           </div>
-          <footer class="modal-footer" style="gap: 0.75rem;">
-            <button type="button" id="modal-editar-btn-cancelar" class="btn btn-secondary">Cancelar</button>
-            <button type="submit" id="modal-editar-btn-guardar" class="btn btn-primary">Guardar Cambios</button>
+          <footer class="modal-footer">
+            <div class="modal-actions-bar">
+              <div class="modal-actions-left">
+                <button type="button" id="btn-modal-anular" class="btn" style="background: var(--warning-light); color: var(--warning); border: 1px solid rgba(217, 119, 6, 0.3);">
+                  Anular Factura (Negocio)
+                </button>
+                <button type="button" id="btn-modal-baja-logica" class="btn" style="background: var(--danger-light); color: var(--danger); border: 1px solid rgba(220, 38, 38, 0.3);">
+                  Baja Lógica (Definitiva)
+                </button>
+              </div>
+              <div class="modal-actions-right">
+                <button type="button" id="modal-editar-btn-cancelar" class="btn btn-secondary">Cancelar</button>
+                <button type="submit" id="modal-editar-btn-guardar" class="btn btn-primary">Guardar Modificaciones</button>
+              </div>
+            </div>
           </footer>
         </form>
       </div>

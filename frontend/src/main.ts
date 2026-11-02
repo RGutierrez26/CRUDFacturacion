@@ -1,8 +1,10 @@
 import './style.css';
 import {
   obtenerFacturas,
-  obtenerFacturaPorNumero,
-  eliminarFacturaPorNumero,
+  obtenerFacturaPorId,
+  eliminarFacturaPorId,
+  anularFacturaPorId,
+  facturarFacturaPorId,
   actualizarFactura,
   obtenerPuntosVenta,
   obtenerClientes,
@@ -12,6 +14,7 @@ import {
 } from './services/obtenerfacturas';
 import type {
   FacturaReporteDTO,
+  FacturaReportePageDTO,
   FacturaFiltrosDTO,
   FacturaVentaDTO,
   FacturaEditDTO,
@@ -28,6 +31,32 @@ const formFiltros = document.getElementById('form-filtros') as HTMLFormElement;
 const btnResetear = document.getElementById('btn-resetear') as HTMLButtonElement;
 const contadorFacturas = document.getElementById('contador-facturas') as HTMLSpanElement;
 
+// Elementos de Paginación del DOM (Inferior y Superior)
+const pagDesde = document.getElementById('pag-desde') as HTMLElement | null;
+const pagHasta = document.getElementById('pag-hasta') as HTMLElement | null;
+const pagTotal = document.getElementById('pag-total') as HTMLElement | null;
+const pagIndicador = document.getElementById('pag-indicador') as HTMLElement | null;
+const btnPagPrimera = document.getElementById('btn-pag-primera') as HTMLButtonElement | null;
+const btnPagAnterior = document.getElementById('btn-pag-anterior') as HTMLButtonElement | null;
+const btnPagSiguiente = document.getElementById('btn-pag-siguiente') as HTMLButtonElement | null;
+const btnPagUltima = document.getElementById('btn-pag-ultima') as HTMLButtonElement | null;
+
+const pagDesdeTop = document.getElementById('pag-desde-top') as HTMLElement | null;
+const pagHastaTop = document.getElementById('pag-hasta-top') as HTMLElement | null;
+const pagTotalTop = document.getElementById('pag-total-top') as HTMLElement | null;
+const pagIndicadorTop = document.getElementById('pag-indicador-top') as HTMLElement | null;
+const btnPagPrimeraTop = document.getElementById('btn-pag-primera-top') as HTMLButtonElement | null;
+const btnPagAnteriorTop = document.getElementById('btn-pag-anterior-top') as HTMLButtonElement | null;
+const btnPagSiguienteTop = document.getElementById('btn-pag-siguiente-top') as HTMLButtonElement | null;
+const btnPagUltimaTop = document.getElementById('btn-pag-ultima-top') as HTMLButtonElement | null;
+
+// Estado de paginación y filtros
+let paginaActual = 0;
+const tamanioPagina = 10;
+let totalPaginas = 1;
+let totalElementos = 0;
+let filtrosActuales: FacturaFiltrosDTO | undefined = undefined;
+
 // Elementos del Modal Revisar Detalle
 const modalDetalle = document.getElementById('modal-detalle') as HTMLDivElement;
 const modalTitulo = document.getElementById('modal-titulo') as HTMLHeadingElement;
@@ -43,6 +72,8 @@ const modalEditarBtnCerrar = document.getElementById('modal-editar-btn-cerrar') 
 const modalEditarBtnCancelar = document.getElementById('modal-editar-btn-cancelar') as HTMLButtonElement;
 const formEditarFactura = document.getElementById('form-editar-factura') as HTMLFormElement;
 const btnGuardarEdicion = document.getElementById('modal-editar-btn-guardar') as HTMLButtonElement;
+const btnModalAnular = document.getElementById('btn-modal-anular') as HTMLButtonElement | null;
+const btnModalBajaLogica = document.getElementById('btn-modal-baja-logica') as HTMLButtonElement | null;
 
 // Interfaz para gestionar ítems en edición
 interface DetalleEdicion {
@@ -85,8 +116,6 @@ function calcularValoresDetalle(cantidad: number, precioUnitario: number, bonifi
 
 // Renderizado de la tabla principal
 function renderizarTabla(facturas: FacturaReporteDTO[]) {
-  contadorFacturas.textContent = `${facturas.length} comprobante(s)`;
-
   if (!facturas || facturas.length === 0) {
     tbody.innerHTML = `
       <tr>
@@ -99,13 +128,24 @@ function renderizarTabla(facturas: FacturaReporteDTO[]) {
   }
 
   tbody.innerHTML = facturas.map((f) => {
-    const estadoStyle = f.estado === 'ANULADA' 
-      ? 'background: var(--danger-light); color: var(--danger);' 
-      : 'background: var(--info-light); color: var(--info);';
+    const estadoUpper = (f.estado || 'PENDIENTE').toUpperCase();
+    let badgeClase = 'badge-estado-pendiente';
+    if (estadoUpper === 'ANULADA') {
+      badgeClase = 'badge-estado-anulada';
+    } else if (estadoUpper === 'EMITIDA') {
+      badgeClase = 'badge-estado-emitida';
+    }
+
+    const esEmitida = estadoUpper === 'EMITIDA';
+    const esAnulada = estadoUpper === 'ANULADA';
+
+    const numeroTexto = (f.numeroFactura != null && f.numeroFactura > 0)
+      ? `#${f.numeroFactura}`
+      : '<span class="badge-estado badge-estado-pendiente" style="font-weight: 600; text-transform: none; padding: 0.1rem 0.45rem;">Pendiente</span>';
 
     return `
       <tr>
-        <td class="factura-num">#${f.numeroFactura}</td>
+        <td class="factura-num">${numeroTexto}</td>
         <td>${formatearFecha(f.fechaEmision)}</td>
         <td><strong>${f.ClienteDenominacion || 'Consumidor Final'}</strong></td>
         <td>${f.condicionIva}</td>
@@ -113,20 +153,20 @@ function renderizarTabla(facturas: FacturaReporteDTO[]) {
         <td class="text-right factura-total">${formatearMoneda(f.importeTotal)}</td>
         <td class="text-center">${f.CantidadItemns}</td>
         <td class="text-center">
-          <span style="display: inline-block; padding: 0.15rem 0.55rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; ${estadoStyle}">
-            ${f.estado || 'EMITIDA'}
+          <span class="badge-estado ${badgeClase}">
+            ${f.estado || 'PENDIENTE'}
           </span>
         </td>
         <td class="text-center">
           <div class="action-buttons">
-            <button class="btn-action btn-review" data-numero="${f.numeroFactura}" title="Revisar detalle">
-              Revisar
+            <button class="btn-action btn-consultar" data-id="${f.id}" title="Consultar detalle de la factura">
+              Consultar
             </button>
-            <button class="btn-action btn-delete" data-numero="${f.numeroFactura}" title="Eliminar/Anular factura">
-              Eliminar
-            </button>
-            <button class="btn-action btn-modify" data-numero="${f.numeroFactura}" title="Modificar factura">
+            <button class="btn-action btn-modify" data-id="${f.id}" title="${esEmitida ? 'No se puede modificar una factura ya emitida' : 'Modificar comprobante y estados'}" ${esEmitida ? 'disabled' : ''}>
               Modificar
+            </button>
+            <button class="btn-action btn-facturar" data-id="${f.id}" title="${esEmitida ? 'Factura ya autorizada ante AFIP' : (esAnulada ? 'Factura anulada' : 'Facturar con AFIP / ARCA')}" ${esEmitida || esAnulada ? 'disabled' : ''}>
+              Facturar
             </button>
           </div>
         </td>
@@ -139,34 +179,61 @@ function renderizarTabla(facturas: FacturaReporteDTO[]) {
 
 // Vincular clicks en la tabla principal
 function vincularEventosTabla() {
-  // Botones Revisar
-  tbody.querySelectorAll('.btn-review').forEach((btn) => {
+  // Botones Consultar
+  tbody.querySelectorAll('.btn-consultar').forEach((btn) => {
     btn.addEventListener('click', async () => {
-      const numero = Number((btn as HTMLElement).dataset.numero);
-      await abrirModalDetalle(numero);
-    });
-  });
-
-  // Botones Eliminar
-  tbody.querySelectorAll('.btn-delete').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const numero = Number((btn as HTMLElement).dataset.numero);
-      await confirmarEliminarFactura(numero);
+      const id = Number((btn as HTMLElement).dataset.id);
+      await abrirModalDetalle(id);
     });
   });
 
   // Botones Modificar
   tbody.querySelectorAll('.btn-modify').forEach((btn) => {
     btn.addEventListener('click', async () => {
-      const numero = Number((btn as HTMLElement).dataset.numero);
-      await abrirModalEditar(numero);
+      const id = Number((btn as HTMLElement).dataset.id);
+      await abrirModalEditar(id);
+    });
+  });
+
+  // Botones Facturar (AFIP/ARCA WSFE)
+  tbody.querySelectorAll('.btn-facturar').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const buttonEl = btn as HTMLButtonElement;
+      const id = Number(buttonEl.dataset.id);
+
+      const confirmar = confirm(`¿Desea enviar la factura a autorizar ante ARCA / AFIP (Entorno de Homologación)?`);
+      if (!confirmar) return;
+
+      const textoOriginal = buttonEl.textContent;
+      buttonEl.disabled = true;
+      buttonEl.textContent = 'Facturando...';
+
+      try {
+        const respuesta = await facturarFacturaPorId(id);
+        alert(
+          `¡Comprobante autorizado con éxito por ARCA / AFIP!\n\n` +
+          `• Comprobante N°: ${respuesta.numero}\n` +
+          `• CAE Oficial: ${respuesta.cae || 'N/A'}\n` +
+          `• Vencimiento CAE: ${respuesta.caeFechaVencimiento ? new Date(respuesta.caeFechaVencimiento).toLocaleDateString() : 'N/A'}\n` +
+          `• Estado AFIP: ${respuesta.resultadoAfip || 'Aprobado'}`
+        );
+        await cargarFacturas(filtrosActuales, paginaActual);
+      } catch (err: any) {
+        alert(`Error al facturar con AFIP: ${err?.message || err}`);
+      } finally {
+        buttonEl.disabled = false;
+        buttonEl.textContent = textoOriginal;
+      }
     });
   });
 }
 
-// Cargar facturas principales
-async function cargarFacturas(filtros?: FacturaFiltrosDTO) {
+// Cargar facturas principales (Paginación Server-Side)
+async function cargarFacturas(filtros?: FacturaFiltrosDTO, page: number = 0) {
   try {
+    filtrosActuales = filtros;
+    paginaActual = page;
+
     tbody.innerHTML = `
       <tr>
         <td colspan="9" class="text-center py-4" style="color: var(--text-muted);">
@@ -174,8 +241,59 @@ async function cargarFacturas(filtros?: FacturaFiltrosDTO) {
         </td>
       </tr>
     `;
-    const facturas = await obtenerFacturas(filtros);
-    renderizarTabla(facturas);
+
+    const data: FacturaReportePageDTO = await obtenerFacturas(filtrosActuales, paginaActual, tamanioPagina);
+
+    totalPaginas = Math.max(1, data.totalPaginas);
+    paginaActual = data.paginaActual;
+    totalElementos = data.totalElementos;
+
+    // Actualizar badges y contadores
+    if (contadorFacturas) {
+      contadorFacturas.textContent = `${totalElementos} comprobante(s)`;
+    }
+
+    if (totalElementos === 0) {
+      if (pagDesde) pagDesde.textContent = '0';
+      if (pagHasta) pagHasta.textContent = '0';
+      if (pagTotal) pagTotal.textContent = '0';
+      if (pagIndicador) pagIndicador.textContent = 'Página 1 de 1';
+
+      if (pagDesdeTop) pagDesdeTop.textContent = '0';
+      if (pagHastaTop) pagHastaTop.textContent = '0';
+      if (pagTotalTop) pagTotalTop.textContent = '0';
+      if (pagIndicadorTop) pagIndicadorTop.textContent = 'Página 1 de 1';
+    } else {
+      const desde = paginaActual * tamanioPagina + 1;
+      const hasta = Math.min((paginaActual + 1) * tamanioPagina, totalElementos);
+      const indicadorTexto = `Página ${paginaActual + 1} de ${totalPaginas}`;
+
+      if (pagDesde) pagDesde.textContent = String(desde);
+      if (pagHasta) pagHasta.textContent = String(hasta);
+      if (pagTotal) pagTotal.textContent = String(totalElementos);
+      if (pagIndicador) pagIndicador.textContent = indicadorTexto;
+
+      if (pagDesdeTop) pagDesdeTop.textContent = String(desde);
+      if (pagHastaTop) pagHastaTop.textContent = String(hasta);
+      if (pagTotalTop) pagTotalTop.textContent = String(totalElementos);
+      if (pagIndicadorTop) pagIndicadorTop.textContent = indicadorTexto;
+    }
+
+    // Actualizar estados de botones de navegación (Inferior y Superior)
+    const esPrimeraPagina = paginaActual <= 0;
+    const esUltimaPagina = paginaActual >= totalPaginas - 1;
+
+    if (btnPagPrimera) btnPagPrimera.disabled = esPrimeraPagina;
+    if (btnPagAnterior) btnPagAnterior.disabled = esPrimeraPagina;
+    if (btnPagSiguiente) btnPagSiguiente.disabled = esUltimaPagina;
+    if (btnPagUltima) btnPagUltima.disabled = esUltimaPagina;
+
+    if (btnPagPrimeraTop) btnPagPrimeraTop.disabled = esPrimeraPagina;
+    if (btnPagAnteriorTop) btnPagAnteriorTop.disabled = esPrimeraPagina;
+    if (btnPagSiguienteTop) btnPagSiguienteTop.disabled = esUltimaPagina;
+    if (btnPagUltimaTop) btnPagUltimaTop.disabled = esUltimaPagina;
+
+    renderizarTabla(data.facturas);
   } catch (error) {
     console.error('Error al cargar facturas:', error);
     tbody.innerHTML = `
@@ -191,13 +309,16 @@ async function cargarFacturas(filtros?: FacturaFiltrosDTO) {
 // ==========================================
 // MODAL REVISAR DETALLE
 // ==========================================
-async function abrirModalDetalle(numero: number) {
-  modalTitulo.textContent = `Detalle de Factura #${numero}`;
+async function abrirModalDetalle(id: number) {
+  modalTitulo.textContent = `Detalle de Factura`;
   modalBody.innerHTML = `<p class="text-center py-4">Cargando información del comprobante...</p>`;
   modalDetalle.classList.remove('hidden');
 
   try {
-    const factura: FacturaVentaDTO = await obtenerFacturaPorNumero(numero);
+    const factura: FacturaVentaDTO = await obtenerFacturaPorId(id);
+    modalTitulo.textContent = (factura.numero != null && factura.numero > 0)
+      ? `Detalle de Factura #${factura.numero}`
+      : `Detalle de Factura (Pendiente AFIP)`;
 
     modalBody.innerHTML = `
       <div class="modal-grid">
@@ -220,7 +341,7 @@ async function abrirModalDetalle(numero: number) {
         </div>
         <div>
           <span class="modal-item-title">Estado</span>
-          <p class="modal-item-value" style="color: ${factura.estado === 'ANULADA' ? 'var(--danger)' : 'var(--primary)'};">
+          <p class="modal-item-value" style="color: ${factura.estado === 'ANULADA' ? 'var(--danger)' : (factura.estado === 'PENDIENTE' ? 'var(--text-muted)' : 'var(--primary)')};">
             ${factura.estado}
           </p>
         </div>
@@ -230,6 +351,13 @@ async function abrirModalDetalle(numero: number) {
             ${formatearMoneda(factura.importeTotal)}
           </p>
         </div>
+        ${factura.cae ? `
+        <div>
+          <span class="modal-item-title">CAE AFIP / ARCA</span>
+          <p class="modal-item-value" style="color: #0369a1; font-weight: 700;">${factura.cae}</p>
+          <small style="color: var(--text-muted);">Vto: ${factura.caeFechaVencimiento ? new Date(factura.caeFechaVencimiento).toLocaleDateString() : '-'}</small>
+        </div>
+        ` : ''}
       </div>
 
       <div>
@@ -268,7 +396,7 @@ async function abrirModalDetalle(numero: number) {
     `;
   } catch (error) {
     console.error('Error al obtener factura:', error);
-    modalBody.innerHTML = `<p style="color: var(--danger);">No se pudo cargar el detalle de la factura #${numero}.</p>`;
+    modalBody.innerHTML = `<p style="color: var(--danger);">No se pudo cargar el detalle del comprobante seleccionado.</p>`;
   }
 }
 
@@ -285,14 +413,14 @@ modalDetalle.addEventListener('click', (e) => {
 // ==========================================
 // MODAL MODIFICAR FACTURA (EDICIÓN COMPLETA)
 // ==========================================
-async function abrirModalEditar(numero: number) {
-  modalEditarTitulo.textContent = `Modificar Factura #${numero}`;
+async function abrirModalEditar(id: number) {
+  modalEditarTitulo.textContent = `Modificar Factura`;
   modalEditarBody.innerHTML = `<p class="text-center py-4">Cargando datos para edición...</p>`;
   modalEditar.classList.remove('hidden');
 
   try {
     const [factura, puntosVenta, clientes, condicionesIva, tiposMoneda, articulos] = await Promise.all([
-      obtenerFacturaPorNumero(numero),
+      obtenerFacturaPorId(id),
       obtenerPuntosVenta(),
       obtenerClientes(),
       obtenerCondicionesIva(),
@@ -301,6 +429,9 @@ async function abrirModalEditar(numero: number) {
     ]);
 
     facturaEnEdicion = factura;
+    modalEditarTitulo.textContent = (factura.numero != null && factura.numero > 0)
+      ? `Modificar Factura #${factura.numero}`
+      : `Modificar Factura (Pendiente AFIP)`;
     articulosMaestros = articulos;
     modificarDetallesActivo = false;
 
@@ -335,11 +466,6 @@ async function abrirModalEditar(numero: number) {
               </option>
             `).join('')}
           </select>
-        </div>
-
-        <div class="form-group">
-          <label for="edit-numero">Número de Factura *</label>
-          <input type="number" id="edit-numero" value="${factura.numero}" min="1" required />
         </div>
 
         <div class="form-group">
@@ -384,6 +510,7 @@ async function abrirModalEditar(numero: number) {
         <div class="form-group">
           <label for="edit-estado">Estado *</label>
           <select id="edit-estado" required>
+            <option value="PENDIENTE" ${factura.estado === 'PENDIENTE' ? 'selected' : ''}>PENDIENTE</option>
             <option value="EMITIDA" ${factura.estado === 'EMITIDA' ? 'selected' : ''}>EMITIDA</option>
             <option value="ANULADA" ${factura.estado === 'ANULADA' ? 'selected' : ''}>ANULADA</option>
           </select>
@@ -420,7 +547,7 @@ async function abrirModalEditar(numero: number) {
 
   } catch (error) {
     console.error('Error al abrir modal de edición:', error);
-    modalEditarBody.innerHTML = `<p style="color: var(--danger);">No se pudo cargar la información para editar la factura #${numero}.</p>`;
+    modalEditarBody.innerHTML = `<p style="color: var(--danger);">No se pudo cargar la información para editar el comprobante seleccionado.</p>`;
   }
 }
 
@@ -489,7 +616,7 @@ function renderizarSeccionDetallesEdicion() {
           <select id="edit-select-producto">
             <option value="">Seleccione un artículo...</option>
             ${articulosMaestros.map(a => `
-              <option value="${a.id}">[${a.articuloCodigo}] ${a.articuloDenominacion} - ${formatearMoneda(a.precioVenta)}</option>
+              <option value="${a.id}">[${a.articuloDTO?.codigo || a.articuloCodigo || 'ART'}] ${a.articuloDTO?.denominacion || a.articuloDenominacion || 'Artículo'} - ${formatearMoneda(a.precioVenta)}</option>
             `).join('')}
           </select>
         </div>
@@ -615,8 +742,8 @@ function renderizarSeccionDetallesEdicion() {
 
     detallesEnEdicion.push({
       listaPrecioArticuloId: art.id,
-      codigo: art.articuloCodigo,
-      descripcion: art.articuloDenominacion,
+      codigo: art.articuloDTO?.codigo || art.articuloCodigo || 'ART',
+      descripcion: art.articuloDTO?.denominacion || art.articuloDenominacion || 'Artículo',
       precioUnitario: art.precioVenta,
       cantidad: cant,
       porcentajeBonificacion: bonif,
@@ -668,13 +795,7 @@ formEditarFactura.addEventListener('submit', async (e) => {
     editPayload.puntoVentaId = puntoVentaVal;
   }
 
-  // 2. Número de Factura
-  const numeroVal = Number((document.getElementById('edit-numero') as HTMLInputElement).value);
-  if (numeroVal && numeroVal !== facturaEnEdicion.numero) {
-    editPayload.numero = numeroVal;
-  }
-
-  // 3. Fecha de Emisión
+  // 2. Fecha de Emisión
   const fechaVal = (document.getElementById('edit-fecha') as HTMLInputElement).value;
   const originalFechaStr = facturaEnEdicion.fechaEmision ? facturaEnEdicion.fechaEmision.split('T')[0] : '';
   if (fechaVal && fechaVal !== originalFechaStr) {
@@ -739,7 +860,7 @@ formEditarFactura.addEventListener('submit', async (e) => {
     const actualizada = await actualizarFactura(facturaEnEdicion.id, editPayload);
     alert(`Factura #${actualizada.numero} actualizada con éxito.`);
     cerrarModalEditar();
-    await cargarFacturas();
+    await cargarFacturas(filtrosActuales, paginaActual);
   } catch (error) {
     console.error('Error al actualizar factura:', error);
     alert(`Error al actualizar la factura: ${error instanceof Error ? error.message : String(error)}`);
@@ -749,20 +870,67 @@ formEditarFactura.addEventListener('submit', async (e) => {
   }
 });
 
-// Confirmar y ejecutar eliminación lógica
-async function confirmarEliminarFactura(numero: number) {
-  const confirma = confirm(`¿Estás seguro de que deseas anular/eliminar la factura #${numero}?`);
+// Acciones dentro del modal de edición: Anulación (Negocio) y Baja Lógica (Definitiva)
+btnModalAnular?.addEventListener('click', async () => {
+  if (!facturaEnEdicion) return;
+  const numDisplay = (facturaEnEdicion.numero != null && facturaEnEdicion.numero > 0)
+    ? `#${facturaEnEdicion.numero}`
+    : `(Pendiente)`;
+
+  const confirma = confirm(
+    `¿Desea anular la factura ${numDisplay}?\n\n` +
+    `Regla de negocio: Su estado cambiará a 'ANULADA' y se registrará la fecha/hora de anulación comercial. ` +
+    `El comprobante seguirá existiendo en el sistema para auditoría contable.`
+  );
   if (!confirma) return;
 
+  btnModalAnular.disabled = true;
+  const textoOriginal = btnModalAnular.textContent;
+  btnModalAnular.textContent = 'Anulando...';
+
   try {
-    await eliminarFacturaPorNumero(numero);
-    alert(`La factura #${numero} fue dada de baja con éxito.`);
-    await cargarFacturas();
+    await anularFacturaPorId(facturaEnEdicion.id);
+    alert(`Factura ${numDisplay} anulada con éxito.`);
+    cerrarModalEditar();
+    await cargarFacturas(filtrosActuales, paginaActual);
   } catch (error) {
-    console.error('Error al eliminar factura:', error);
-    alert(`No se pudo eliminar la factura #${numero}.`);
+    console.error('Error al anular factura:', error);
+    alert(`Error al anular la factura: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    btnModalAnular.disabled = false;
+    btnModalAnular.textContent = textoOriginal;
   }
-}
+});
+
+btnModalBajaLogica?.addEventListener('click', async () => {
+  if (!facturaEnEdicion) return;
+  const numDisplay = (facturaEnEdicion.numero != null && facturaEnEdicion.numero > 0)
+    ? `#${facturaEnEdicion.numero}`
+    : `(Pendiente)`;
+
+  const confirma = confirm(
+    `¿Desea dar de BAJA LÓGICA definitiva a la factura ${numDisplay}?\n\n` +
+    `Baja definitiva: Se registrará la fechaHoraBaja del registro y la factura quedará eliminada de las listas activas.`
+  );
+  if (!confirma) return;
+
+  btnModalBajaLogica.disabled = true;
+  const textoOriginal = btnModalBajaLogica.textContent;
+  btnModalBajaLogica.textContent = 'Dando de baja...';
+
+  try {
+    await eliminarFacturaPorId(facturaEnEdicion.id);
+    alert(`Factura ${numDisplay} dada de baja lógica con éxito.`);
+    cerrarModalEditar();
+    await cargarFacturas(filtrosActuales, paginaActual);
+  } catch (error) {
+    console.error('Error al dar de baja lógica:', error);
+    alert(`Error al dar de baja lógica: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    btnModalBajaLogica.disabled = false;
+    btnModalBajaLogica.textContent = textoOriginal;
+  }
+});
 
 // Búsqueda y Filtros
 formFiltros.addEventListener('submit', async (e) => {
@@ -780,13 +948,61 @@ formFiltros.addEventListener('submit', async (e) => {
     montoMinimo: montoMinimoInput ? Number(montoMinimoInput) : undefined
   };
 
-  await cargarFacturas(filtros);
+  paginaActual = 0;
+  await cargarFacturas(filtros, 0);
 });
 
 // Resetear filtros manualmente
 btnResetear.addEventListener('click', async () => {
   formFiltros.reset();
-  await cargarFacturas();
+  filtrosActuales = undefined;
+  paginaActual = 0;
+  await cargarFacturas(undefined, 0);
+});
+
+// Controles de Paginación (Inferior y Superior)
+btnPagPrimera?.addEventListener('click', async () => {
+  if (paginaActual > 0) {
+    await cargarFacturas(filtrosActuales, 0);
+  }
+});
+btnPagPrimeraTop?.addEventListener('click', async () => {
+  if (paginaActual > 0) {
+    await cargarFacturas(filtrosActuales, 0);
+  }
+});
+
+btnPagAnterior?.addEventListener('click', async () => {
+  if (paginaActual > 0) {
+    await cargarFacturas(filtrosActuales, paginaActual - 1);
+  }
+});
+btnPagAnteriorTop?.addEventListener('click', async () => {
+  if (paginaActual > 0) {
+    await cargarFacturas(filtrosActuales, paginaActual - 1);
+  }
+});
+
+btnPagSiguiente?.addEventListener('click', async () => {
+  if (paginaActual < totalPaginas - 1) {
+    await cargarFacturas(filtrosActuales, paginaActual + 1);
+  }
+});
+btnPagSiguienteTop?.addEventListener('click', async () => {
+  if (paginaActual < totalPaginas - 1) {
+    await cargarFacturas(filtrosActuales, paginaActual + 1);
+  }
+});
+
+btnPagUltima?.addEventListener('click', async () => {
+  if (paginaActual < totalPaginas - 1) {
+    await cargarFacturas(filtrosActuales, totalPaginas - 1);
+  }
+});
+btnPagUltimaTop?.addEventListener('click', async () => {
+  if (paginaActual < totalPaginas - 1) {
+    await cargarFacturas(filtrosActuales, totalPaginas - 1);
+  }
 });
 
 // Botón Agregar Factura -> Redirección a nueva-factura.html

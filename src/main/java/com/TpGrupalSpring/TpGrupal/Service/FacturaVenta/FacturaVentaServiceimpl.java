@@ -45,7 +45,7 @@ public class FacturaVentaServiceimpl implements FacturaVentaService {
     @Override
     @Transactional(readOnly = true)
     public List<FacturaVentaDTO> findAll() {
-        return facturaVentaRepository.findAll().stream()
+        return facturaVentaRepository.findByFechaBajaIsNull().stream()
                 .map(FacturaVentaDTO::toDTO)
                 .toList();
     }
@@ -53,14 +53,14 @@ public class FacturaVentaServiceimpl implements FacturaVentaService {
     @Override
     @Transactional(readOnly = true)
     public FacturaVentaDTO findById(Long id) {
-        FacturaVenta factura = facturaVentaRepository.findById(id)
+        FacturaVenta factura = facturaVentaRepository.findByIdActiva(id)
                 .orElseThrow(() -> new RuntimeException("Factura con ID " + id + " no encontrada"));
         return FacturaVentaDTO.toDTO(factura);
     }
     @Override
     @Transactional(readOnly = true)
     public FacturaVentaDTO findByNumeroFactura(Long numeroFactura) {
-        FacturaVenta factura = facturaVentaRepository.findByNumero(numeroFactura)
+        FacturaVenta factura = facturaVentaRepository.findByNumeroAndFechaBajaIsNull(numeroFactura)
                 .orElseThrow(() -> new RuntimeException("Factura con número " + numeroFactura + " no encontrada"));
         return FacturaVentaDTO.toDTO(factura);
     }
@@ -97,13 +97,12 @@ public class FacturaVentaServiceimpl implements FacturaVentaService {
         FacturaVenta factura = new FacturaVenta();
         factura.setUsuarioCarga(usuarioCarga);
         factura.setUsuarioModificacion(usuarioCarga);
-        factura.setNumero(requestDTO.numero());
         factura.setFechaEmision(requestDTO.fechaEmision() != null ? requestDTO.fechaEmision() : new Date());
         factura.setPuntoVenta(puntoVenta);
         factura.setCondicionIva(condicionIva);
         factura.setTipoMoneda(tipoMoneda);
         factura.setCliente(cliente);
-        factura.setEstado(requestDTO.estado() != null && !requestDTO.estado().isBlank() ? requestDTO.estado() : "EMITIDA");
+        factura.setEstado("PENDIENTE");
         factura.setObservaciones(requestDTO.observaciones());
         factura.setDetalles(new ArrayList<>());
 
@@ -129,6 +128,10 @@ public class FacturaVentaServiceimpl implements FacturaVentaService {
     public FacturaVentaDTO update(Long id, FacturaEditDTO editDTO) {
         FacturaVenta factura = facturaVentaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Factura con ID " + id + " no encontrada"));
+
+        if(factura.getNumero() != null && factura.getNumero() > 0) {
+            throw new RuntimeException("No se puede modificar la factura #" + factura.getNumero() + " ya que ha sido emitida.");
+        }
 
         PuntoVenta pv = null;
         if (editDTO.puntoVentaId() != null) {
@@ -174,24 +177,68 @@ public class FacturaVentaServiceimpl implements FacturaVentaService {
     }
 
     @Override
-    public void deleteById(Long id) {
+    public void deleteById(Long id) { //baja logica
         FacturaVenta factura = facturaVentaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Factura con ID " + id + " no encontrada"));
-        factura.setEstado("ANULADA");
-        factura.setFechaAnulacion(new Date());
         factura.setFechaBaja(new Date());
         facturaVentaRepository.save(factura);
     }
 
     @Override
-    public void deleteByNumeroFactura(Long numeroFactura) {
-        FacturaVenta factura = facturaVentaRepository.findByNumero(numeroFactura)
+    public void deleteByNumeroFactura(Long numeroFactura) { // da baja logica
+        FacturaVenta factura = facturaVentaRepository.findByNumeroAndFechaBajaIsNull(numeroFactura)
                 .orElseThrow(() -> new RuntimeException("Factura con número " + numeroFactura + " no encontrada"));
-        factura.setEstado("ANULADA");
-        factura.setFechaAnulacion(new Date());
         factura.setFechaBaja(new Date());
         facturaVentaRepository.save(factura);
     }
+
+    @Override
+    public void darBajaLogica(Long numeroFactura) {
+        FacturaVenta factura = facturaVentaRepository.findByNumeroAndFechaBajaIsNull(numeroFactura)
+                .orElseThrow(() -> new RuntimeException("Factura con número " + numeroFactura + " no encontrada"));
+        if(factura.getNumero() != null && factura.getNumero() > 0) {
+            throw new RuntimeException("No se puede dar de baja la factura #" + factura.getNumero() + " ya que ha sido emitida.");
+        }
+        factura.setFechaBaja(new Date());
+        facturaVentaRepository.save(factura);
+    }
+
+    @Override
+    public FacturaVentaDTO anularFactura(Long numeroFactura) {
+        FacturaVenta factura = facturaVentaRepository.findByNumeroAndFechaBajaIsNull(numeroFactura)
+                .orElseThrow(() -> new RuntimeException("Factura con número " + numeroFactura + " no encontrada"));
+
+        if (factura.getNumero() != null && factura.getNumero() > 0) {
+            throw new RuntimeException("No se puede anular la factura #" + factura.getNumero() + " ya que ha sido emitida.");
+        }
+        if ("ANULADA".equalsIgnoreCase(factura.getEstado())) {
+            throw new RuntimeException("La factura #" + numeroFactura + " ya se encuentra anulada");
+        }
+        factura.setFechaAnulacion(new Date());
+        factura.setEstado("ANULADA");
+        factura.setFechaModificacion(new Date());
+        factura= facturaVentaRepository.save(factura);
+        return FacturaVentaDTO.toDTO(factura);
+    }
+
+    @Override
+    public FacturaVentaDTO anularFacturaPorId(Long id) {
+        FacturaVenta factura = facturaVentaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Factura con ID " + id + " no encontrada"));
+
+        if (factura.getNumero() != null && factura.getNumero() > 0) {
+            throw new RuntimeException("No se puede anular la factura #" + factura.getNumero() + " ya que ha sido emitida.");
+        }
+        if ("ANULADA".equalsIgnoreCase(factura.getEstado())) {
+            throw new RuntimeException("La factura ya se encuentra anulada");
+        }
+        factura.setFechaAnulacion(new Date());
+        factura.setEstado("ANULADA");
+        factura.setFechaModificacion(new Date());
+        factura = facturaVentaRepository.save(factura);
+        return FacturaVentaDTO.toDTO(factura);
+    }
+
 
     private FacturaVentaDetalle crearDetalle(FacturaVenta factura, FacturaDetalleRequestDTO detDTO) {
         ListaPrecioArticulo lpa = listaPrecioArticuloRepository.findById(detDTO.listaPrecioArticuloId())

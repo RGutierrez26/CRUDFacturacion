@@ -12,4 +12,5 @@ public interface ListaPrecioArticuloService {
     ListaPrecioArticuloDTO save(ListaPrecioArticuloCreate createDTO);
     ListaPrecioArticuloDTO update(Long id, ListaPrecioArticuloEdit editDTO);
     void deleteById(Long id);
+    List<ListaPrecioArticuloDTO> findByListaPrecioId(Long listaPrecioId);
 }

@@ -33,14 +33,43 @@ export interface TipoMonedaDTO {
   simbolo: string;
 }
 
+export interface MarcaDTO {
+  id: number;
+  codigo: number;
+  denominacion: string;
+}
+
+export interface RubroDTO {
+  id: number;
+  codigo: number;
+  denominacion: string;
+}
+
+export interface ArticuloDTO {
+  id: number;
+  codigo: string;
+  denominacion: string;
+  marcaDTO?: MarcaDTO | null;
+  rubroDTO?: RubroDTO | null;
+}
+
+export interface ListaPrecioDTO {
+  id: number;
+  codigo: string;
+  denominacion: string;
+}
+
 export interface ListaPrecioArticuloDTO {
   id: number;
-  listaPrecioId: number;
-  listaPrecioDenominacion: string;
-  articuloId: number;
-  articuloCodigo: string;
-  articuloDenominacion: string;
   precioVenta: number;
+  listaPrecioDTO?: ListaPrecioDTO | null;
+  articuloDTO?: ArticuloDTO | null;
+  // Campos heredados o aplanados para compatibilidad
+  listaPrecioId?: number;
+  listaPrecioDenominacion?: string;
+  articuloId?: number;
+  articuloCodigo?: string;
+  articuloDenominacion?: string;
 }
 
 // ==========================================
@@ -70,6 +99,10 @@ export interface FacturaVentaDTO {
   importeTotal: number;
   importeCobrado: number;
   importeSaldo: number;
+  cae?: string | null;
+  caeFechaVencimiento?: string | null;
+  resultadoAfip?: string | null;
+  motivoRechazo?: string | null;
   estado: string;
   fechaAnulacion?: string | null;
   observaciones?: string | null;
@@ -93,9 +126,8 @@ export interface FacturaRequestDTO {
   clienteId?: number | null;
   condicionIvaId: number;
   tipoMonedaId: number;
-  numero: number;
+  numero?: number;
   fechaEmision?: string;
-  estado?: string;
   observaciones?: string;
   usuarioCargaId?: number | null;
   detalles: FacturaDetalleRequestDTO[];
@@ -119,7 +151,8 @@ export interface FacturaEditDTO {
 // ==========================================
 
 export interface FacturaReporteDTO {
-  numeroFactura: number;
+  id: number;
+  numeroFactura?: number | null;
   fechaEmision: string;
   ClienteDenominacion: string;
   condicionIva: string;
@@ -127,6 +160,14 @@ export interface FacturaReporteDTO {
   importeTotal: number;
   CantidadItemns: number;
   estado: string;
+}
+
+export interface FacturaReportePageDTO {
+  facturas: FacturaReporteDTO[];
+  paginaActual: number;
+  totalPaginas: number;
+  totalElementos: number;
+  tamanioPagina: number;
 }
 
 export interface FacturaFiltrosDTO {

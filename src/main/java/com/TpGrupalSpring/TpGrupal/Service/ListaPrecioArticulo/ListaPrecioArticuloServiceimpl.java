@@ -17,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Date;
 import java.util.List;
 
+import static org.springframework.data.jpa.domain.AbstractPersistable_.id;
+
 @Service
 @Transactional
 public class ListaPrecioArticuloServiceimpl implements ListaPrecioArticuloService {
@@ -41,6 +43,13 @@ public class ListaPrecioArticuloServiceimpl implements ListaPrecioArticuloServic
     @Transactional(readOnly = true)
     public List<ListaPrecioArticuloDTO> findAll() {
         return listaPrecioArticuloRepository.findAll().stream()
+                .map(ListaPrecioArticuloDTO::toDTO)
+                .toList();
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public List<ListaPrecioArticuloDTO> findByListaPrecioId(Long listaPrecioId) {
+        return listaPrecioArticuloRepository.findByListaPrecioId(listaPrecioId).stream()
                 .map(ListaPrecioArticuloDTO::toDTO)
                 .toList();
     }

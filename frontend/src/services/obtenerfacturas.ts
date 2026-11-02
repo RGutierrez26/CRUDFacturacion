@@ -1,5 +1,5 @@
 import type { 
-  FacturaReporteDTO, 
+  FacturaReportePageDTO,
   FacturaFiltrosDTO, 
   FacturaVentaDTO, 
   FacturaRequestDTO,
@@ -8,14 +8,19 @@ import type {
   PuntoVentaDTO,
   CondicionIvaDTO,
   TipoMonedaDTO,
+  ListaPrecioDTO,
   ListaPrecioArticuloDTO
 } from '../models/factura.dto';
 import { getResources } from '../Util/getResources';
 
 const BASE_URL = 'http://localhost:8080/api';
 
-// Facturas
-export async function obtenerFacturas(filtros?: FacturaFiltrosDTO): Promise<FacturaReporteDTO[]> {
+// Facturas (Paginadas desde el Backend)
+export async function obtenerFacturas(
+  filtros?: FacturaFiltrosDTO,
+  page: number = 0,
+  size: number = 10
+): Promise<FacturaReportePageDTO> {
   const params = new URLSearchParams();
 
   if (filtros) {
@@ -27,12 +32,40 @@ export async function obtenerFacturas(filtros?: FacturaFiltrosDTO): Promise<Fact
     }
   }
 
+  params.append('page', page.toString());
+  params.append('size', size.toString());
+
   const query = params.toString() ? `?${params.toString()}` : '';
-  return getResources<FacturaReporteDTO[]>(`${BASE_URL}/facturareportes${query}`);
+  return getResources<FacturaReportePageDTO>(`${BASE_URL}/facturareportes${query}`);
 }
 
 export async function obtenerFacturaPorNumero(numero: number): Promise<FacturaVentaDTO> {
   return getResources<FacturaVentaDTO>(`${BASE_URL}/facturas/numero/${numero}`);
+}
+
+export async function obtenerFacturaPorId(id: number): Promise<FacturaVentaDTO> {
+  return getResources<FacturaVentaDTO>(`${BASE_URL}/facturas/${id}`);
+}
+
+export async function eliminarFacturaPorId(id: number): Promise<void> {
+  const response = await fetch(`${BASE_URL}/facturas/${id}`, {
+    method: 'DELETE'
+  });
+  if (!response.ok && response.status !== 204) {
+    throw new Error(`Error al eliminar factura: ${response.statusText}`);
+  }
+}
+
+export async function anularFacturaPorId(id: number): Promise<FacturaVentaDTO> {
+  const response = await fetch(`${BASE_URL}/facturas/${id}/anular`, {
+    method: 'POST'
+  });
+  if (!response.ok) {
+    const errorJson = await response.json().catch(() => null);
+    const mensaje = errorJson?.message || `Error al anular la factura (${response.status})`;
+    throw new Error(mensaje);
+  }
+  return response.json();
 }
 
 export async function eliminarFacturaPorNumero(numero: number): Promise<void> {
@@ -42,6 +75,42 @@ export async function eliminarFacturaPorNumero(numero: number): Promise<void> {
   if (!response.ok && response.status !== 204) {
     throw new Error(`Error al eliminar factura: ${response.statusText}`);
   }
+}
+
+export async function anularFacturaPorNumero(numero: number): Promise<FacturaVentaDTO> {
+  const response = await fetch(`${BASE_URL}/facturas/numero/${numero}/anular`, {
+    method: 'POST'
+  });
+  if (!response.ok) {
+    const errorJson = await response.json().catch(() => null);
+    const mensaje = errorJson?.message || `Error al anular la factura (${response.status})`;
+    throw new Error(mensaje);
+  }
+  return response.json();
+}
+
+export async function facturarFacturaPorNumero(numero: number): Promise<FacturaVentaDTO> {
+  const response = await fetch(`${BASE_URL}/facturas/numero/${numero}/facturar`, {
+    method: 'POST'
+  });
+  if (!response.ok) {
+    const errorJson = await response.json().catch(() => null);
+    const mensaje = errorJson?.message || `Error al facturar en AFIP/ARCA (${response.status})`;
+    throw new Error(mensaje);
+  }
+  return response.json();
+}
+
+export async function facturarFacturaPorId(id: number): Promise<FacturaVentaDTO> {
+  const response = await fetch(`${BASE_URL}/facturas/${id}/facturar`, {
+    method: 'POST'
+  });
+  if (!response.ok) {
+    const errorJson = await response.json().catch(() => null);
+    const mensaje = errorJson?.message || `Error al facturar en AFIP/ARCA (${response.status})`;
+    throw new Error(mensaje);
+  }
+  return response.json();
 }
 
 export async function crearFactura(factura: FacturaRequestDTO): Promise<FacturaVentaDTO> {
@@ -99,4 +168,12 @@ export async function obtenerTiposMoneda(): Promise<TipoMonedaDTO[]> {
 
 export async function obtenerListasPrecioArticulos(): Promise<ListaPrecioArticuloDTO[]> {
   return getResources<ListaPrecioArticuloDTO[]>(`${BASE_URL}/listas-precio-articulos`);
+}
+
+export async function obtenerListasPrecio(): Promise<ListaPrecioDTO[]> {
+  return getResources<ListaPrecioDTO[]>(`${BASE_URL}/listaprecios`);
+}
+
+export async function obtenerArticulosPorListaPrecio(listaPrecioId: number): Promise<ListaPrecioArticuloDTO[]> {
+  return getResources<ListaPrecioArticuloDTO[]>(`${BASE_URL}/listas-precio-articulos/listas-precio/${listaPrecioId}`);
 }

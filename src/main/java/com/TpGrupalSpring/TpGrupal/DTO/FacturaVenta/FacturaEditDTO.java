@@ -10,9 +10,7 @@ public record FacturaEditDTO(
         Long clienteId,
         Long condicionIvaId,
         Long tipoMonedaId,
-        Long numero,
         Date fechaEmision,
-        String estado,
         String observaciones,
         Long usuarioModificacionId,
         List<FacturaDetalleRequestDTO> detalles
@@ -39,18 +37,11 @@ public record FacturaEditDTO(
             factura.setTipoMoneda(tipoMoneda);
         }
 
-        if (this.numero != null) {
-            factura.setNumero(this.numero);
-        }
+
         if (this.fechaEmision != null) {
             factura.setFechaEmision(this.fechaEmision);
         }
-        if (this.estado != null && !this.estado.isBlank()) {
-            factura.setEstado(this.estado);
-            if ("ANULADA".equalsIgnoreCase(this.estado)) {
-                factura.setFechaAnulacion(new Date());
-            }
-        }
+
         if (this.observaciones != null) {
             factura.setObservaciones(this.observaciones);
         }

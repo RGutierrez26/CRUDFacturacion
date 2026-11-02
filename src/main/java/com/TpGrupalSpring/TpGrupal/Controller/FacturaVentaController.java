@@ -3,6 +3,8 @@ package com.TpGrupalSpring.TpGrupal.Controller;
 import com.TpGrupalSpring.TpGrupal.DTO.FacturaVenta.FacturaEditDTO;
 import com.TpGrupalSpring.TpGrupal.DTO.FacturaVenta.FacturaRequestDTO;
 import com.TpGrupalSpring.TpGrupal.DTO.FacturaVenta.FacturaVentaDTO;
+import com.TpGrupalSpring.TpGrupal.Service.Afip.AfipWsaaService;
+import com.TpGrupalSpring.TpGrupal.Service.Afip.AfipWsfeService;
 import com.TpGrupalSpring.TpGrupal.Service.FacturaVenta.FacturaVentaService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,9 +16,13 @@ import java.util.List;
 @RestController
 public class FacturaVentaController {
     private final FacturaVentaService facturaVentaService;
+    private final AfipWsfeService afipWsfeService;
+    private final AfipWsaaService afipWsaaService;
 
-    public FacturaVentaController(FacturaVentaService facturaVentaService) {
+    public FacturaVentaController(FacturaVentaService facturaVentaService, AfipWsfeService afipWsfeService, AfipWsaaService afipWsaaService) {
         this.facturaVentaService = facturaVentaService;
+        this.afipWsfeService = afipWsfeService;
+        this.afipWsaaService = afipWsaaService;
     }
 
     @GetMapping
@@ -46,13 +52,33 @@ public class FacturaVentaController {
         facturaVentaService.deleteById(id);
         return ResponseEntity.noContent().build(); // 204 No Content
     }
-    @GetMapping("/numero/{numero}")
-    public ResponseEntity<FacturaVentaDTO> getByNumero(@PathVariable Long numero) {
-        return ResponseEntity.ok(facturaVentaService.findByNumeroFactura(numero));
+
+
+    // 2. Endpoint para ANULAR FACTURA (Regla de negocio)
+    @PostMapping("/{id}/anular")
+    public ResponseEntity<FacturaVentaDTO> anularFacturaPorId(@PathVariable Long id) {
+        FacturaVentaDTO anulada = facturaVentaService.anularFacturaPorId(id);
+        return ResponseEntity.ok(anulada);
     }
-    @DeleteMapping("/numero/{numero}")
-    public ResponseEntity<Void> deleteByNumero(@PathVariable Long numero) {
-        facturaVentaService.deleteByNumeroFactura(numero);
-        return ResponseEntity.noContent().build(); // 204 No Content
+
+
+
+    // 3. Endpoint para FACTURAR CON ARCA / AFIP (Obtención de CAE y Número Oficial)
+    @PostMapping("/{id}/facturar")
+    public ResponseEntity<FacturaVentaDTO> facturarConAfip(@PathVariable Long id) {
+        FacturaVentaDTO facturada = afipWsfeService.facturar(id);
+        return ResponseEntity.ok(facturada);
     }
+
+    // 4. Endpoint de diagnóstico para probar autenticación WSAA en vivo
+    @GetMapping("/afip/test-wsaa")
+    public ResponseEntity<String> testWsaa() {
+        try {
+            String[] auth = afipWsaaService.obtenerTokenYSign("wsfe");
+            return ResponseEntity.ok("¡Conexión y Autenticación con AFIP WSAA Exitosa!\nToken: " + auth[0].substring(0, 40) + "...\nSign: " + auth[1].substring(0, 40) + "...");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error AFIP WSAA: " + e.getMessage());
+        }
+    }
+
 }

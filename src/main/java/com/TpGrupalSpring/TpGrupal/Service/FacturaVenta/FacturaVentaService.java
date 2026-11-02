@@ -14,4 +14,7 @@ public interface FacturaVentaService {
     void deleteById(Long id);
     FacturaVentaDTO findByNumeroFactura(Long numeroFactura);
     void deleteByNumeroFactura(Long numeroFactura);
+    void darBajaLogica(Long numeroFactura); //este da baja logica
+    FacturaVentaDTO anularFactura(Long numeroFactura); //este da de negocio
+    FacturaVentaDTO anularFacturaPorId(Long id);
 }

@@ -3,6 +3,7 @@ package com.TpGrupalSpring.TpGrupal.DTO.Consultas;
 import java.util.Date;
 
 public record FacturaReporteDTO(
+        Long id,
         Long numeroFactura,
         Date fechaEmision,
         String ClienteDenominacion,

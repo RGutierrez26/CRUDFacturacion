@@ -1,9 +1,9 @@
 package com.TpGrupalSpring.TpGrupal.Controller;
 
 import com.TpGrupalSpring.TpGrupal.DTO.ListaPrecioArticulo.ListaPrecioArticuloDTO;
-import com.TpGrupalSpring.TpGrupal.Entities.Dominio.ListaPrecioArticulo;
-import com.TpGrupalSpring.TpGrupal.Service.ListaPrecioArticulo.ListaPrecioArticuloServiceimpl;
+import com.TpGrupalSpring.TpGrupal.Service.ListaPrecioArticulo.ListaPrecioArticuloService;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -13,14 +13,19 @@ import java.util.List;
 @RequestMapping("/api/listas-precio-articulos")
 public class ListaPrecioArticuloRestController {
 
-    private final ListaPrecioArticuloServiceimpl listaPrecioArticuloService;
+    private final ListaPrecioArticuloService listaPrecioArticuloService;
 
-    public ListaPrecioArticuloRestController(ListaPrecioArticuloServiceimpl listaPrecioArticuloService) {
+    public ListaPrecioArticuloRestController(ListaPrecioArticuloService listaPrecioArticuloService) {
         this.listaPrecioArticuloService = listaPrecioArticuloService;
     }
 
     @GetMapping
-    public List<ListaPrecioArticuloDTO> getListaPrecioArticulo() {
+    public List<ListaPrecioArticuloDTO> getAll() {
         return listaPrecioArticuloService.findAll();
+    }
+
+    @GetMapping("/listas-precio/{listaPrecioId}")
+    public List<ListaPrecioArticuloDTO> getByListaPrecioId(@PathVariable Long listaPrecioId) {
+        return listaPrecioArticuloService.findByListaPrecioId(listaPrecioId);
     }
 }

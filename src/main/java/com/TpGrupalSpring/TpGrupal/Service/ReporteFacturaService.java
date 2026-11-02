@@ -1,6 +1,7 @@
 package com.TpGrupalSpring.TpGrupal.Service;
 
 import com.TpGrupalSpring.TpGrupal.DTO.Consultas.FacturaReporteDTO;
+import com.TpGrupalSpring.TpGrupal.DTO.Consultas.FacturaReportePageDTO;
 import com.lowagie.text.*;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
@@ -29,6 +30,7 @@ public class ReporteFacturaService {
     @Transactional(readOnly = true)
     public List<FacturaReporteDTO> obtenerReporteFacturas() {
         String jpql = "SELECT new com.TpGrupalSpring.TpGrupal.DTO.Consultas.FacturaReporteDTO(" +
+                "   f.id, " +
                 "   f.numero, " +
                 "   f.fechaEmision, " +
                 "   COALESCE(c.denominacion, 'Consumidor Final'), " +
@@ -43,6 +45,7 @@ public class ReporteFacturaService {
                 "JOIN f.condicionIva ci " +
                 "JOIN f.puntoVenta pv " +
                 "JOIN f.detalles d " +
+                "WHERE f.fechaBaja IS NULL " +
                 "GROUP BY f.id, f.numero, f.fechaEmision, c.denominacion, ci.denominacion, pv.descripcion, f.importeTotal, f.estado";
 
         return em.createQuery(jpql, FacturaReporteDTO.class).getResultList();
@@ -75,7 +78,7 @@ public class ReporteFacturaService {
 
         // Filas con datos
         for (FacturaReporteDTO f : facturas) {
-            table.addCell(String.valueOf(f.numeroFactura()));
+            table.addCell(f.numeroFactura() != null ? String.valueOf(f.numeroFactura()) : "Pendiente");
             table.addCell(f.fechaEmision() != null ? sdf.format(f.fechaEmision()) : "-");
             table.addCell(f.ClienteDenominacion());
             table.addCell(f.condicionIva());
@@ -100,7 +103,7 @@ public class ReporteFacturaService {
             // Filas
             for (FacturaReporteDTO f : facturas) {
                 writer.println(
-                        f.numeroFactura() + "\t" +
+                        (f.numeroFactura() != null ? f.numeroFactura() : "Pendiente") + "\t" +
                                 (f.fechaEmision() != null ? sdf.format(f.fechaEmision()) : "-") + "\t" +
                                 f.ClienteDenominacion() + "\t" +
                                 f.condicionIva() + "\t" +
@@ -114,47 +117,75 @@ public class ReporteFacturaService {
     }
 
     @Transactional(readOnly = true)
-    // Reporte para Método Rest
-    public List<FacturaReporteDTO> ObtenerFacturas(Date fechaDesde, Date fechaHasta, String estado, Double montoMinimo) {
-        StringBuilder jpql = new StringBuilder("SELECT new com.TpGrupalSpring.TpGrupal.DTO.Consultas.FacturaReporteDTO(" +
+    // Reporte Paginado para Método Rest (solo cuenta registros donde fechaBaja IS NULL)
+    public FacturaReportePageDTO ObtenerFacturas(Date fechaDesde, Date fechaHasta, String estado, Double montoMinimo, int page, int size) {
+        if (size <= 0) size = 10;
+        if (page < 0) page = 0;
+
+        StringBuilder whereClause = new StringBuilder(" WHERE f.fechaBaja IS NULL ");
+        Map<String, Object> params = new HashMap<>();
+
+        if (fechaDesde != null) {
+            whereClause.append(" AND f.fechaEmision >= :fechaDesde ");
+            params.put("fechaDesde", fechaDesde);
+        }
+        if (fechaHasta != null) {
+            whereClause.append(" AND f.fechaEmision <= :fechaHasta ");
+            params.put("fechaHasta", fechaHasta);
+        }
+        if (estado != null && !estado.trim().isEmpty()) {
+            whereClause.append(" AND f.estado = :estado ");
+            params.put("estado", estado);
+        }
+        if (montoMinimo != null) {
+            whereClause.append(" AND f.importeTotal >= :montoMinimo ");
+            params.put("montoMinimo", montoMinimo);
+        }
+
+        // 1. Conteo total exacto respetando f.fechaBaja IS NULL y filtros
+        String countJpql = "SELECT COUNT(f) FROM FacturaVenta f " + whereClause;
+        TypedQuery<Long> countQuery = em.createQuery(countJpql, Long.class);
+        params.forEach(countQuery::setParameter);
+        long totalElementos = countQuery.getSingleResult();
+
+        int totalPaginas = (int) Math.ceil((double) totalElementos / size);
+        if (totalPaginas == 0) {
+            totalPaginas = 1;
+        }
+
+        // 2. Consulta paginada con ordenamiento estable descendente
+        String dataJpql = "SELECT new com.TpGrupalSpring.TpGrupal.DTO.Consultas.FacturaReporteDTO(" +
+                "   f.id, " +
                 "   f.numero, " +
                 "   f.fechaEmision, " +
                 "   COALESCE(c.denominacion, 'Consumidor Final'), " +
-                "   ci.denominacion, " +
-                "   pv.descripcion, " +
+                "   COALESCE(ci.denominacion, '-'), " +
+                "   COALESCE(pv.descripcion, '-'), " +
                 "   f.importeTotal, " +
                 "   COUNT(d), " +
                 "   f.estado " +
                 ") " +
                 "FROM FacturaVenta f " +
                 "LEFT JOIN f.cliente c " +
-                "JOIN f.condicionIva ci " +
-                "JOIN f.puntoVenta pv " +
-                "JOIN f.detalles d " +
-                "WHERE 1=1");
-        Map<String, Object> params = new HashMap<>();
+                "LEFT JOIN f.condicionIva ci " +
+                "LEFT JOIN f.puntoVenta pv " +
+                "LEFT JOIN f.detalles d " +
+                whereClause +
+                " GROUP BY f.id, f.numero, f.fechaEmision, c.denominacion, ci.denominacion, pv.descripcion, f.importeTotal, f.estado " +
+                " ORDER BY f.id DESC";
 
-        if (fechaDesde != null) {
-            jpql.append(" AND f.fechaEmision >= :fechaDesde ");
-            params.put("fechaDesde", fechaDesde);
-        }
-        if (fechaHasta != null) {
-            jpql.append(" AND f.fechaEmision <= :fechaHasta ");
-            params.put("fechaHasta", fechaHasta);
-        }
-        if (estado != null && !estado.trim().isEmpty()) {
-            jpql.append(" AND f.estado = :estado ");
-            params.put("estado", estado);
-        }
-        if (montoMinimo != null) {
-            jpql.append(" AND f.importeTotal >= :montoMinimo ");
-            params.put("montoMinimo", montoMinimo);
-        }
-
-        jpql.append(" GROUP BY f.id, f.numero, f.fechaEmision, c.denominacion, ci.denominacion, pv.descripcion, f.importeTotal, f.estado");
-
-        TypedQuery<FacturaReporteDTO> query = em.createQuery(jpql.toString(), FacturaReporteDTO.class);
+        TypedQuery<FacturaReporteDTO> query = em.createQuery(dataJpql, FacturaReporteDTO.class);
         params.forEach(query::setParameter);
-        return query.getResultList();
+        query.setFirstResult(page * size);
+        query.setMaxResults(size);
+
+        List<FacturaReporteDTO> facturas = query.getResultList();
+        return new FacturaReportePageDTO(facturas, page, totalPaginas, totalElementos, size);
+    }
+
+    @Transactional(readOnly = true)
+    // Sobrecarga para mantener compatibilidad sin paginación si se requiere
+    public List<FacturaReporteDTO> ObtenerFacturas(Date fechaDesde, Date fechaHasta, String estado, Double montoMinimo) {
+        return ObtenerFacturas(fechaDesde, fechaHasta, estado, montoMinimo, 0, Integer.MAX_VALUE).facturas();
     }
 }
