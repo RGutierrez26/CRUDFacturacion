@@ -10,7 +10,8 @@ import {
   obtenerClientes,
   obtenerCondicionesIva,
   obtenerTiposMoneda,
-  obtenerListasPrecioArticulos
+  obtenerListasPrecioArticulos,
+  descargarReporte
 } from './services/obtenerfacturas';
 import type {
   FacturaReporteDTO,
@@ -1004,6 +1005,29 @@ btnPagUltimaTop?.addEventListener('click', async () => {
     await cargarFacturas(filtrosActuales, totalPaginas - 1);
   }
 });
+
+// Botones de Exportación (PDF y Excel) con selección de directorio
+const btnExportarPdf = document.getElementById('btn-exportar-pdf') as HTMLButtonElement | null;
+const btnExportarExcel = document.getElementById('btn-exportar-excel') as HTMLButtonElement | null;
+
+async function ejecutarExportacion(tipo: 'pdf' | 'excel', btn: HTMLButtonElement | null) {
+  if (!btn) return;
+  const textoOriginal = btn.textContent || '';
+  try {
+    btn.disabled = true;
+    btn.textContent = 'Descargando...';
+    await descargarReporte(tipo, filtrosActuales);
+  } catch (error: any) {
+    console.error(`Error al exportar reporte ${tipo}:`, error);
+    alert(`Error al exportar a ${tipo.toUpperCase()}: ${error.message || error}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = textoOriginal;
+  }
+}
+
+btnExportarPdf?.addEventListener('click', () => ejecutarExportacion('pdf', btnExportarPdf));
+btnExportarExcel?.addEventListener('click', () => ejecutarExportacion('excel', btnExportarExcel));
 
 // Botón Agregar Factura -> Redirección a nueva-factura.html
 document.getElementById('btn-nueva-factura')?.addEventListener('click', () => {

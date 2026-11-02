@@ -42,14 +42,14 @@ public class ListaPrecioArticuloServiceimpl implements ListaPrecioArticuloServic
     @Override
     @Transactional(readOnly = true)
     public List<ListaPrecioArticuloDTO> findAll() {
-        return listaPrecioArticuloRepository.findAll().stream()
+        return listaPrecioArticuloRepository.findByFechaBajaIsNull().stream()
                 .map(ListaPrecioArticuloDTO::toDTO)
                 .toList();
     }
     @Override
     @Transactional(readOnly = true)
     public List<ListaPrecioArticuloDTO> findByListaPrecioId(Long listaPrecioId) {
-        return listaPrecioArticuloRepository.findByListaPrecioId(listaPrecioId).stream()
+        return listaPrecioArticuloRepository.findByListaPrecioIdAndFechaBajaIsNull(listaPrecioId).stream()
                 .map(ListaPrecioArticuloDTO::toDTO)
                 .toList();
     }

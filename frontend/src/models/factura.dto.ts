@@ -160,6 +160,8 @@ export interface FacturaReporteDTO {
   importeTotal: number;
   CantidadItemns: number;
   estado: string;
+  cae?: string | null;
+  caeFechaVencimiento?: string | null;
 }
 
 export interface FacturaReportePageDTO {

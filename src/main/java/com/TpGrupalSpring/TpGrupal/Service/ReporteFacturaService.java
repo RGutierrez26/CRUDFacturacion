@@ -11,9 +11,13 @@ import jakarta.persistence.TypedQuery;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
@@ -34,27 +38,29 @@ public class ReporteFacturaService {
                 "   f.numero, " +
                 "   f.fechaEmision, " +
                 "   COALESCE(c.denominacion, 'Consumidor Final'), " +
-                "   ci.denominacion, " +
-                "   pv.descripcion, " +
+                "   COALESCE(ci.denominacion, '-'), " +
+                "   COALESCE(pv.descripcion, '-'), " +
                 "   f.importeTotal, " +
                 "   COUNT(d), " +
-                "   f.estado " +
+                "   f.estado, " +
+                "   f.cae, " +
+                "   f.caeFechaVencimiento " +
                 ") " +
                 "FROM FacturaVenta f " +
                 "LEFT JOIN f.cliente c " +
-                "JOIN f.condicionIva ci " +
-                "JOIN f.puntoVenta pv " +
-                "JOIN f.detalles d " +
+                "LEFT JOIN f.condicionIva ci " +
+                "LEFT JOIN f.puntoVenta pv " +
+                "LEFT JOIN f.detalles d " +
                 "WHERE f.fechaBaja IS NULL " +
-                "GROUP BY f.id, f.numero, f.fechaEmision, c.denominacion, ci.denominacion, pv.descripcion, f.importeTotal, f.estado";
+                "GROUP BY f.id, f.numero, f.fechaEmision, c.denominacion, ci.denominacion, pv.descripcion, f.importeTotal, f.estado, f.cae, f.caeFechaVencimiento";
 
         return em.createQuery(jpql, FacturaReporteDTO.class).getResultList();
     }
 
-    // 2. Generación de Archivo PDF (usando OpenPDF / iText)
-    public void generarPdf(List<FacturaReporteDTO> facturas, String rutaArchivo) throws Exception {
+    // 2. Generación de Archivo PDF (usando OpenPDF / iText con CAE y Vto. CAE)
+    public void generarPdf(List<FacturaReporteDTO> facturas, OutputStream outputStream) throws Exception {
         Document document = new Document(PageSize.A4.rotate()); // Horizontal para que entren las columnas
-        PdfWriter.getInstance(document, new FileOutputStream(rutaArchivo));
+        PdfWriter.getInstance(document, outputStream);
         document.open();
 
         // Título
@@ -64,12 +70,12 @@ public class ReporteFacturaService {
         document.add(titulo);
         document.add(new Paragraph(" ")); // Espacio en blanco
 
-        // Tabla con 8 columnas (incluye Estado)
-        PdfPTable table = new PdfPTable(8);
+        // Tabla con 10 columnas (incluye Estado, CAE y Vto. CAE)
+        PdfPTable table = new PdfPTable(10);
         table.setWidthPercentage(100);
 
         // Encabezados
-        String[] columnas = {"N° Factura", "Fecha", "Cliente", "Cond. IVA", "Punto Venta", "Total", "Ítems", "Estado"};
+        String[] columnas = {"N° Factura", "Fecha", "Cliente", "Cond. IVA", "Punto Venta", "Total", "Ítems", "Estado", "CAE", "Vto. CAE"};
         for (String col : columnas) {
             table.addCell(col);
         }
@@ -80,40 +86,69 @@ public class ReporteFacturaService {
         for (FacturaReporteDTO f : facturas) {
             table.addCell(f.numeroFactura() != null ? String.valueOf(f.numeroFactura()) : "Pendiente");
             table.addCell(f.fechaEmision() != null ? sdf.format(f.fechaEmision()) : "-");
-            table.addCell(f.ClienteDenominacion());
-            table.addCell(f.condicionIva());
-            table.addCell(f.puntoVentaDescripcion());
+            table.addCell(f.ClienteDenominacion() != null ? f.ClienteDenominacion() : "Consumidor Final");
+            table.addCell(f.condicionIva() != null ? f.condicionIva() : "-");
+            table.addCell(f.puntoVentaDescripcion() != null ? f.puntoVentaDescripcion() : "-");
             table.addCell("$" + f.importeTotal());
             table.addCell(String.valueOf(f.CantidadItemns()));
             table.addCell(f.estado() != null ? f.estado() : "-");
+            table.addCell(f.cae() != null ? f.cae() : "-");
+            table.addCell(f.caeFechaVencimiento() != null ? sdf.format(f.caeFechaVencimiento()) : "-");
         }
 
         document.add(table);
         document.close();
     }
 
-    // 3. Generación de Archivo Excel (TSV separado por tabulaciones '\t')
-    public void generarExcelTSV(List<FacturaReporteDTO> facturas, String rutaArchivo) throws Exception {
+    public void generarPdf(List<FacturaReporteDTO> facturas, String rutaArchivo) throws Exception {
+        try (FileOutputStream fos = new FileOutputStream(rutaArchivo)) {
+            generarPdf(facturas, fos);
+        }
+    }
+
+    public byte[] generarPdfBytes(List<FacturaReporteDTO> facturas) throws Exception {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        generarPdf(facturas, baos);
+        return baos.toByteArray();
+    }
+
+    // 3. Generación de Archivo Excel (TSV separado por tabulaciones '\t' con CAE y Vto. CAE)
+    public void generarExcelTSV(List<FacturaReporteDTO> facturas, OutputStream outputStream) throws Exception {
         SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
 
-        try (PrintWriter writer = new PrintWriter(new FileWriter(rutaArchivo))) {
+        try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8))) {
             // Cabecera separada por tabulaciones (\t)
-            writer.println("N° Factura\tFecha Emisión\tCliente\tCondición IVA\tPunto de Venta\tImporte Total\tCantidad Ítems\tEstado");
+            writer.println("N° Factura\tFecha Emisión\tCliente\tCondición IVA\tPunto de Venta\tImporte Total\tCantidad Ítems\tEstado\tCAE\tVto. CAE");
 
             // Filas
             for (FacturaReporteDTO f : facturas) {
                 writer.println(
                         (f.numeroFactura() != null ? f.numeroFactura() : "Pendiente") + "\t" +
                                 (f.fechaEmision() != null ? sdf.format(f.fechaEmision()) : "-") + "\t" +
-                                f.ClienteDenominacion() + "\t" +
-                                f.condicionIva() + "\t" +
-                                f.puntoVentaDescripcion() + "\t" +
+                                (f.ClienteDenominacion() != null ? f.ClienteDenominacion() : "Consumidor Final") + "\t" +
+                                (f.condicionIva() != null ? f.condicionIva() : "-") + "\t" +
+                                (f.puntoVentaDescripcion() != null ? f.puntoVentaDescripcion() : "-") + "\t" +
                                 f.importeTotal() + "\t" +
                                 f.CantidadItemns() + "\t" +
-                                (f.estado() != null ? f.estado() : "-")
+                                (f.estado() != null ? f.estado() : "-") + "\t" +
+                                (f.cae() != null ? f.cae() : "-") + "\t" +
+                                (f.caeFechaVencimiento() != null ? sdf.format(f.caeFechaVencimiento()) : "-")
                 );
             }
+            writer.flush();
         }
+    }
+
+    public void generarExcelTSV(List<FacturaReporteDTO> facturas, String rutaArchivo) throws Exception {
+        try (FileOutputStream fos = new FileOutputStream(rutaArchivo)) {
+            generarExcelTSV(facturas, fos);
+        }
+    }
+
+    public byte[] generarExcelTSVBytes(List<FacturaReporteDTO> facturas) throws Exception {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        generarExcelTSV(facturas, baos);
+        return baos.toByteArray();
     }
 
     @Transactional(readOnly = true)
@@ -163,7 +198,9 @@ public class ReporteFacturaService {
                 "   COALESCE(pv.descripcion, '-'), " +
                 "   f.importeTotal, " +
                 "   COUNT(d), " +
-                "   f.estado " +
+                "   f.estado, " +
+                "   f.cae, " +
+                "   f.caeFechaVencimiento " +
                 ") " +
                 "FROM FacturaVenta f " +
                 "LEFT JOIN f.cliente c " +
@@ -171,7 +208,7 @@ public class ReporteFacturaService {
                 "LEFT JOIN f.puntoVenta pv " +
                 "LEFT JOIN f.detalles d " +
                 whereClause +
-                " GROUP BY f.id, f.numero, f.fechaEmision, c.denominacion, ci.denominacion, pv.descripcion, f.importeTotal, f.estado " +
+                " GROUP BY f.id, f.numero, f.fechaEmision, c.denominacion, ci.denominacion, pv.descripcion, f.importeTotal, f.estado, f.cae, f.caeFechaVencimiento " +
                 " ORDER BY f.id DESC";
 
         TypedQuery<FacturaReporteDTO> query = em.createQuery(dataJpql, FacturaReporteDTO.class);

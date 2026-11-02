@@ -59,8 +59,9 @@ public record FacturaEditDTO(
                 factura.agregarDetalle(det);
                 total += det.getImporteSubtotal();
             }
+            total = Math.round(total * 100.0) / 100.0;
             factura.setImporteTotal(total);
-            factura.setImporteSaldo(total - factura.getImporteCobrado());
+            factura.setImporteSaldo(Math.round((total - factura.getImporteCobrado()) * 100.0) / 100.0);
         }
     }
 }

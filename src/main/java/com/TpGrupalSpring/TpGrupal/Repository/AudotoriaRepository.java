@@ -11,8 +11,8 @@ import java.util.Optional;
 @NoRepositoryBean
 public interface AudotoriaRepository<T, ID> extends JpaRepository<T, ID> {
 
+    List<T> findByFechaBajaIsNull();
 
-
-
+    Optional<T> findByIdAndFechaBajaIsNull(ID id);
 
 }

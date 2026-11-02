@@ -21,7 +21,7 @@ public class ListaPrecioServiceimpl implements ListaPrecioService {
     @Override
     @Transactional(readOnly = true)
     public List<ListaPrecioDTO> findAll() {
-        return listaPrecioRepository.findAll().stream()
+        return listaPrecioRepository.findByFechaBajaIsNull().stream()
                 .map(ListaPrecioDTO::toDTO)
                 .toList();
     }

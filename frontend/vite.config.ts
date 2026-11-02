@@ -14,8 +14,8 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'index.html'),
-        nuevaFactura: resolve(__dirname, 'nueva-factura.html')
+        main: resolve(import.meta.dirname, 'index.html'),
+        nuevaFactura: resolve(import.meta.dirname, 'nueva-factura.html')
       }
     }
   }

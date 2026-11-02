@@ -177,3 +177,72 @@ export async function obtenerListasPrecio(): Promise<ListaPrecioDTO[]> {
 export async function obtenerArticulosPorListaPrecio(listaPrecioId: number): Promise<ListaPrecioArticuloDTO[]> {
   return getResources<ListaPrecioArticuloDTO[]>(`${BASE_URL}/listas-precio-articulos/listas-precio/${listaPrecioId}`);
 }
+
+// Exportación y descarga de reportes (con selección de directorio mediante File System Access API)
+export async function descargarReporte(
+  tipo: 'pdf' | 'excel',
+  filtros?: FacturaFiltrosDTO
+): Promise<void> {
+  const params = new URLSearchParams();
+
+  if (filtros) {
+    if (filtros.fechaDesde) params.append('fechaDesde', filtros.fechaDesde);
+    if (filtros.fechaHasta) params.append('fechaHasta', filtros.fechaHasta);
+    if (filtros.estado) params.append('estado', filtros.estado);
+    if (filtros.montoMinimo != null && !isNaN(filtros.montoMinimo)) {
+      params.append('montoMinimo', filtros.montoMinimo.toString());
+    }
+  }
+
+  const query = params.toString() ? `?${params.toString()}` : '';
+  const url = `${BASE_URL}/facturareportes/exportar/${tipo}${query}`;
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Error al generar el reporte ${tipo.toUpperCase()} (${response.status})`);
+  }
+
+  const blob = await response.blob();
+  const nombreSugerido = tipo === 'pdf' ? 'reporte_facturas.pdf' : 'reporte_facturas.xls';
+
+  // Si el navegador soporta File System Access API, abre la ventana nativa "Guardar como" para elegir ubicación
+  if ('showSaveFilePicker' in window) {
+    try {
+      const handle = await (window as any).showSaveFilePicker({
+        suggestedName: nombreSugerido,
+        types: tipo === 'pdf' ? [
+          {
+            description: 'Documento PDF (*.pdf)',
+            accept: { 'application/pdf': ['.pdf'] }
+          }
+        ] : [
+          {
+            description: 'Archivo Excel (*.xls)',
+            accept: { 'application/vnd.ms-excel': ['.xls'] }
+          }
+        ]
+      });
+
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return;
+    } catch (err: any) {
+      // Si el usuario canceló el selector de archivos, se ignora
+      if (err.name === 'AbortError') {
+        return;
+      }
+      console.warn('showSaveFilePicker no disponible o cancelado, usando descarga estándar:', err);
+    }
+  }
+
+  // Fallback estándar en navegadores sin soporte de File System Access API
+  const downloadUrl = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = downloadUrl;
+  a.download = nombreSugerido;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(downloadUrl);
+}

@@ -28,7 +28,7 @@ public class PuntoVentaServiceimpl implements PuntoVentaService {
     @Override
     @Transactional(readOnly = true)
     public List<PuntoVentaDTO> findAll() {
-        return puntoVentaRepository.findAll().stream()
+        return puntoVentaRepository.findByFechaBajaIsNull().stream()
                 .map(PuntoVentaDTO::toDTO)
                 .toList();
     }

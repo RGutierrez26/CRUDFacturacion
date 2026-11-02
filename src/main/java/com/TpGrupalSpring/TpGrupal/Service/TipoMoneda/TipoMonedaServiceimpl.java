@@ -28,7 +28,7 @@ public class TipoMonedaServiceimpl implements TipoMonedaService {
     @Override
     @Transactional(readOnly = true)
     public List<TipoMonedaDTO> findAll() {
-        return tipoMonedaRepository.findAll().stream()
+        return tipoMonedaRepository.findByFechaBajaIsNull().stream()
                 .map(TipoMonedaDTO::toDTO)
                 .toList();
     }

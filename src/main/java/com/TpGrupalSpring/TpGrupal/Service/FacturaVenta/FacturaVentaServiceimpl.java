@@ -116,6 +116,7 @@ public class FacturaVentaServiceimpl implements FacturaVentaService {
             }
         }
 
+        totalFactura = Math.round(totalFactura * 100.0) / 100.0;
         factura.setImporteTotal(totalFactura);
         factura.setImporteSaldo(totalFactura);
         factura.setImporteCobrado(0.0);
@@ -129,8 +130,16 @@ public class FacturaVentaServiceimpl implements FacturaVentaService {
         FacturaVenta factura = facturaVentaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Factura con ID " + id + " no encontrada"));
 
-        if(factura.getNumero() != null && factura.getNumero() > 0) {
-            throw new RuntimeException("No se puede modificar la factura #" + factura.getNumero() + " ya que ha sido emitida.");
+        if (factura.getFechaBaja() != null) {
+            throw new RuntimeException("No se puede modificar una factura que ha sido dada de baja lógica.");
+        }
+
+        if ("ANULADA".equalsIgnoreCase(factura.getEstado())) {
+            throw new RuntimeException("No se puede modificar una factura que se encuentra en estado ANULADA.");
+        }
+
+        if ("EMITIDA".equalsIgnoreCase(factura.getEstado()) || (factura.getNumero() != null && factura.getNumero() > 0)) {
+            throw new RuntimeException("No se puede modificar la factura ya que ha sido emitida ante AFIP.");
         }
 
         PuntoVenta pv = null;
@@ -180,6 +189,11 @@ public class FacturaVentaServiceimpl implements FacturaVentaService {
     public void deleteById(Long id) { //baja logica
         FacturaVenta factura = facturaVentaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Factura con ID " + id + " no encontrada"));
+
+        if ("EMITIDA".equalsIgnoreCase(factura.getEstado()) || (factura.getNumero() != null && factura.getNumero() > 0)) {
+            throw new RuntimeException("No se puede dar de baja lógica una factura que ya ha sido emitida y autorizada legalmente ante AFIP.");
+        }
+
         factura.setFechaBaja(new Date());
         facturaVentaRepository.save(factura);
     }
@@ -226,8 +240,12 @@ public class FacturaVentaServiceimpl implements FacturaVentaService {
         FacturaVenta factura = facturaVentaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Factura con ID " + id + " no encontrada"));
 
-        if (factura.getNumero() != null && factura.getNumero() > 0) {
-            throw new RuntimeException("No se puede anular la factura #" + factura.getNumero() + " ya que ha sido emitida.");
+        if (factura.getFechaBaja() != null) {
+            throw new RuntimeException("No se puede anular una factura que ha sido dada de baja lógica.");
+        }
+
+        if ("EMITIDA".equalsIgnoreCase(factura.getEstado()) || (factura.getNumero() != null && factura.getNumero() > 0)) {
+            throw new RuntimeException("No se puede anular la factura ya que ha sido emitida y autorizada legalmente ante AFIP.");
         }
         if ("ANULADA".equalsIgnoreCase(factura.getEstado())) {
             throw new RuntimeException("La factura ya se encuentra anulada");
@@ -241,16 +259,27 @@ public class FacturaVentaServiceimpl implements FacturaVentaService {
 
 
     private FacturaVentaDetalle crearDetalle(FacturaVenta factura, FacturaDetalleRequestDTO detDTO) {
+        if (detDTO.cantidad() <= 0) {
+            throw new RuntimeException("La cantidad del ítem debe ser mayor a cero.");
+        }
+        if (detDTO.porcentajeBonificacion() < 0 || detDTO.porcentajeBonificacion() > 100) {
+            throw new RuntimeException("El porcentaje de bonificación debe estar comprendido entre 0% y 100%.");
+        }
+
         ListaPrecioArticulo lpa = listaPrecioArticuloRepository.findById(detDTO.listaPrecioArticuloId())
                 .orElseThrow(() -> new RuntimeException("Precio de Artículo con ID " + detDTO.listaPrecioArticuloId() + " no encontrado"));
 
+        if (lpa.getFechaBaja() != null) {
+            throw new RuntimeException("El artículo seleccionado se encuentra dado de baja lógica.");
+        }
+
         double precioUnitario = detDTO.precioUnitario() > 0 ? detDTO.precioUnitario() : lpa.getPrecioVenta();
         double bonificacion = detDTO.porcentajeBonificacion();
-        double importeBruto = detDTO.cantidad() * precioUnitario;
-        double descuento = importeBruto * (bonificacion / 100.0);
-        double importeNeto = importeBruto - descuento;
-        double importeIva = importeNeto * 0.21;
-        double importeSubtotal = importeNeto + importeIva;
+        double importeBruto = Math.round(detDTO.cantidad() * precioUnitario * 100.0) / 100.0;
+        double descuento = Math.round(importeBruto * (bonificacion / 100.0) * 100.0) / 100.0;
+        double importeNeto = Math.round((importeBruto - descuento) * 100.0) / 100.0;
+        double importeIva = Math.round(importeNeto * 0.21 * 100.0) / 100.0;
+        double importeSubtotal = Math.round((importeNeto + importeIva) * 100.0) / 100.0;
 
         String descripcion = (detDTO.descripcion() != null && !detDTO.descripcion().isBlank())
                 ? detDTO.descripcion()

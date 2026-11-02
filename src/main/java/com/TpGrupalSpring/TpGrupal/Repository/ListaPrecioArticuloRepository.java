@@ -8,4 +8,5 @@ import java.util.List;
 @Repository
 public interface ListaPrecioArticuloRepository extends AudotoriaRepository<ListaPrecioArticulo, Long> {
     List<ListaPrecioArticulo> findByListaPrecioId(Long listaPrecioId);
+    List<ListaPrecioArticulo> findByListaPrecioIdAndFechaBajaIsNull(Long listaPrecioId);
 }

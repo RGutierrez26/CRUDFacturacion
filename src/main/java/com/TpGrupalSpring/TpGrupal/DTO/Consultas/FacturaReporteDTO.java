@@ -11,6 +11,8 @@ public record FacturaReporteDTO(
         String puntoVentaDescripcion,
         double importeTotal,
         Long CantidadItemns,
-        String estado
+        String estado,
+        String cae,
+        Date caeFechaVencimiento
 ) {
 }

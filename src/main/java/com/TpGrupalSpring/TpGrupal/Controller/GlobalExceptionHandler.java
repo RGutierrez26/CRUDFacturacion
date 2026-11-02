@@ -18,8 +18,9 @@ public class GlobalExceptionHandler {
             HttpServletRequest request) {
 
         // 1. Determinar el código HTTP seguro sin riesgo de NullPointerException
-        String msg = ex.getMessage();
-        HttpStatus status = (msg != null && msg.toLowerCase().contains("no encontrad"))
+        String rawMsg = ex.getMessage();
+        String msg = (rawMsg != null && !rawMsg.isBlank()) ? rawMsg : "Error procesando la solicitud: " + ex.getClass().getSimpleName();
+        HttpStatus status = msg.toLowerCase().contains("no encontrad")
                 ? HttpStatus.NOT_FOUND      // 404 (No encontrado / no encontrada)
                 : HttpStatus.BAD_REQUEST;   // 400 (Cualquier otro error de validación/negocio)
 

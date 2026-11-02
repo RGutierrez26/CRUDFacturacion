@@ -28,7 +28,7 @@ public class CondicionIvaServiceimpl implements CondicionIvaService {
     @Override
     @Transactional(readOnly = true)
     public List<CondicionIvaDTO> findAll() {
-        return condicionIvaRepository.findAll().stream()
+        return condicionIvaRepository.findByFechaBajaIsNull().stream()
                 .map(CondicionIvaDTO::toDTO)
                 .toList();
     }

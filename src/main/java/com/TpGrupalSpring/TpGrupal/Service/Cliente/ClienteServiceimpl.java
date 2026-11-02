@@ -28,7 +28,7 @@ public class ClienteServiceimpl implements ClienteService {
     @Override
     @Transactional(readOnly = true)
     public List<ClienteDTO> findAll() {
-        return clienteRepository.findAll().stream()
+        return clienteRepository.findByFechaBajaIsNull().stream()
                 .map(ClienteDTO::toDTO)
                 .toList();
     }
