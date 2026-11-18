@@ -9,6 +9,8 @@ import com.TpGrupalSpring.TpGrupal.Repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -70,6 +72,7 @@ public class FacturaVentaServiceimpl implements FacturaVentaService {
         if (requestDTO.detalles() == null || requestDTO.detalles().isEmpty()) {
             throw new RuntimeException("La factura debe contener al menos un detalle. No se permite crear una factura sin ítems.");
         }
+        validarFechaNoFutura(requestDTO.fechaEmision());
 
         PuntoVenta puntoVenta = puntoVentaRepository.findById(requestDTO.puntoVentaId())
                 .orElseThrow(() -> new RuntimeException("Punto de Venta con ID " + requestDTO.puntoVentaId() + " no encontrado"));
@@ -142,6 +145,8 @@ public class FacturaVentaServiceimpl implements FacturaVentaService {
             throw new RuntimeException("No se puede modificar la factura ya que ha sido emitida ante AFIP.");
         }
 
+        validarFechaNoFutura(editDTO.fechaEmision());
+
         PuntoVenta pv = null;
         if (editDTO.puntoVentaId() != null) {
             pv = puntoVentaRepository.findById(editDTO.puntoVentaId())
@@ -190,11 +195,14 @@ public class FacturaVentaServiceimpl implements FacturaVentaService {
         FacturaVenta factura = facturaVentaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Factura con ID " + id + " no encontrada"));
 
-        if ("EMITIDA".equalsIgnoreCase(factura.getEstado()) || (factura.getNumero() != null && factura.getNumero() > 0)) {
+        if ("EMITIDA".equalsIgnoreCase(factura.getEstado())
+                || (factura.getCae() != null && !factura.getCae().isBlank())
+                || (factura.getNumero() != null && factura.getNumero() > 0)) {
             throw new RuntimeException("No se puede dar de baja lógica una factura que ya ha sido emitida y autorizada legalmente ante AFIP.");
         }
 
         factura.setFechaBaja(new Date());
+        factura.setEstado("BORRADO");
         facturaVentaRepository.save(factura);
     }
 
@@ -222,8 +230,8 @@ public class FacturaVentaServiceimpl implements FacturaVentaService {
         FacturaVenta factura = facturaVentaRepository.findByNumeroAndFechaBajaIsNull(numeroFactura)
                 .orElseThrow(() -> new RuntimeException("Factura con número " + numeroFactura + " no encontrada"));
 
-        if (factura.getNumero() != null && factura.getNumero() > 0) {
-            throw new RuntimeException("No se puede anular la factura #" + factura.getNumero() + " ya que ha sido emitida.");
+        if (factura.getCae() == null || factura.getCae().isBlank()) {
+            throw new RuntimeException("Solo se puede anular una factura que ya haya sido facturada ante AFIP (con CAE). Si aún no tiene CAE, puede eliminarla.");
         }
         if ("ANULADA".equalsIgnoreCase(factura.getEstado())) {
             throw new RuntimeException("La factura #" + numeroFactura + " ya se encuentra anulada");
@@ -244,8 +252,8 @@ public class FacturaVentaServiceimpl implements FacturaVentaService {
             throw new RuntimeException("No se puede anular una factura que ha sido dada de baja lógica.");
         }
 
-        if ("EMITIDA".equalsIgnoreCase(factura.getEstado()) || (factura.getNumero() != null && factura.getNumero() > 0)) {
-            throw new RuntimeException("No se puede anular la factura ya que ha sido emitida y autorizada legalmente ante AFIP.");
+        if (factura.getCae() == null || factura.getCae().isBlank()) {
+            throw new RuntimeException("Solo se puede anular una factura que ya haya sido facturada ante AFIP (con CAE). Si aún no tiene CAE, puede eliminarla.");
         }
         if ("ANULADA".equalsIgnoreCase(factura.getEstado())) {
             throw new RuntimeException("La factura ya se encuentra anulada");
@@ -257,6 +265,16 @@ public class FacturaVentaServiceimpl implements FacturaVentaService {
         return FacturaVentaDTO.toDTO(factura);
     }
 
+
+    private void validarFechaNoFutura(Date fechaEmision) {
+        if (fechaEmision == null) {
+            return;
+        }
+        LocalDate fecha = fechaEmision.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        if (fecha.isAfter(LocalDate.now())) {
+            throw new RuntimeException("No se puede cargar ni emitir una factura con fecha futura.");
+        }
+    }
 
     private FacturaVentaDetalle crearDetalle(FacturaVenta factura, FacturaDetalleRequestDTO detDTO) {
         if (detDTO.cantidad() <= 0) {

@@ -10,6 +10,7 @@ import {
   obtenerClientes,
   obtenerCondicionesIva,
   obtenerTiposMoneda,
+  obtenerListasPrecio,
   obtenerListasPrecioArticulos,
   descargarReporte
 } from './services/obtenerfacturas';
@@ -23,6 +24,7 @@ import type {
   ClienteDTO,
   CondicionIvaDTO,
   TipoMonedaDTO,
+  ListaPrecioDTO,
   ListaPrecioArticuloDTO
 } from './models/factura.dto';
 
@@ -81,6 +83,7 @@ interface DetalleEdicion {
   listaPrecioArticuloId: number;
   codigo: string;
   descripcion: string;
+  listaPrecioNombre: string;
   precioUnitario: number;
   cantidad: number;
   porcentajeBonificacion: number;
@@ -92,6 +95,8 @@ interface DetalleEdicion {
 // Estado para edición
 let facturaEnEdicion: FacturaVentaDTO | null = null;
 let detallesEnEdicion: DetalleEdicion[] = [];
+let listasPrecioMaestras: ListaPrecioDTO[] = [];
+let listaPrecioEdicionId: number | null = null;
 let articulosMaestros: ListaPrecioArticuloDTO[] = [];
 let modificarDetallesActivo = false;
 
@@ -139,10 +144,20 @@ function renderizarTabla(facturas: FacturaReporteDTO[]) {
 
     const esEmitida = estadoUpper === 'EMITIDA';
     const esAnulada = estadoUpper === 'ANULADA';
+    const tieneCae = Boolean(f.cae && f.cae.trim() !== '');
+    const estaFacturada = esEmitida || tieneCae;
 
     const numeroTexto = (f.numeroFactura != null && f.numeroFactura > 0)
       ? `#${f.numeroFactura}`
       : '<span class="badge-estado badge-estado-pendiente" style="font-weight: 600; text-transform: none; padding: 0.1rem 0.45rem;">Pendiente</span>';
+
+    const botonAnularOEliminar = tieneCae
+      ? `<button class="btn-action btn-anular" data-id="${f.id}" title="${esAnulada ? 'La factura ya se encuentra anulada' : 'Anular comprobante facturado ante AFIP'}" ${esAnulada ? 'disabled' : ''}>
+           Anular
+         </button>`
+      : `<button class="btn-action btn-delete" data-id="${f.id}" title="Eliminar comprobante (baja lógica)">
+           Eliminar
+         </button>`;
 
     return `
       <tr>
@@ -163,12 +178,13 @@ function renderizarTabla(facturas: FacturaReporteDTO[]) {
             <button class="btn-action btn-consultar" data-id="${f.id}" title="Consultar detalle de la factura">
               Consultar
             </button>
-            <button class="btn-action btn-modify" data-id="${f.id}" title="${esEmitida ? 'No se puede modificar una factura ya emitida' : 'Modificar comprobante y estados'}" ${esEmitida ? 'disabled' : ''}>
+            <button class="btn-action btn-modify" data-id="${f.id}" title="${estaFacturada ? 'No se puede modificar una factura ya facturada' : 'Modificar comprobante y estados'}" ${estaFacturada || esAnulada ? 'disabled' : ''}>
               Modificar
             </button>
-            <button class="btn-action btn-facturar" data-id="${f.id}" title="${esEmitida ? 'Factura ya autorizada ante AFIP' : (esAnulada ? 'Factura anulada' : 'Facturar con AFIP / ARCA')}" ${esEmitida || esAnulada ? 'disabled' : ''}>
+            <button class="btn-action btn-facturar" data-id="${f.id}" title="${estaFacturada ? 'Factura ya autorizada ante AFIP' : (esAnulada ? 'Factura anulada' : 'Facturar con AFIP / ARCA')}" ${estaFacturada || esAnulada ? 'disabled' : ''}>
               Facturar
             </button>
+            ${botonAnularOEliminar}
           </div>
         </td>
       </tr>
@@ -222,6 +238,60 @@ function vincularEventosTabla() {
       } catch (err: any) {
         alert(`Error al facturar con AFIP: ${err?.message || err}`);
       } finally {
+        buttonEl.disabled = false;
+        buttonEl.textContent = textoOriginal;
+      }
+    });
+  });
+
+  // Botones Anular (solo facturas con CAE)
+  tbody.querySelectorAll('.btn-anular').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const buttonEl = btn as HTMLButtonElement;
+      const id = Number(buttonEl.dataset.id);
+      const confirma = confirm(
+        '¿Desea anular esta factura?\n\n' +
+        'Regla de negocio: Su estado cambiará a ANULADA y se registrará la fecha/hora de anulación comercial.'
+      );
+      if (!confirma) return;
+
+      const textoOriginal = buttonEl.textContent;
+      buttonEl.disabled = true;
+      buttonEl.textContent = 'Anulando...';
+
+      try {
+        await anularFacturaPorId(id);
+        alert('Factura anulada con éxito.');
+        await cargarFacturas(filtrosActuales, paginaActual);
+      } catch (err: any) {
+        alert(`Error al anular la factura: ${err?.message || err}`);
+        buttonEl.disabled = false;
+        buttonEl.textContent = textoOriginal;
+      }
+    });
+  });
+
+  // Botones Eliminar (solo facturas sin CAE)
+  tbody.querySelectorAll('.btn-delete').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const buttonEl = btn as HTMLButtonElement;
+      const id = Number(buttonEl.dataset.id);
+      const confirma = confirm(
+        '¿Desea eliminar esta factura?\n\n' +
+        'Se aplicará baja lógica y dejará de mostrarse en el listado activo.'
+      );
+      if (!confirma) return;
+
+      const textoOriginal = buttonEl.textContent;
+      buttonEl.disabled = true;
+      buttonEl.textContent = 'Eliminando...';
+
+      try {
+        await eliminarFacturaPorId(id);
+        alert('Factura eliminada con éxito.');
+        await cargarFacturas(filtrosActuales, paginaActual);
+      } catch (err: any) {
+        alert(`Error al eliminar la factura: ${err?.message || err}`);
         buttonEl.disabled = false;
         buttonEl.textContent = textoOriginal;
       }
@@ -368,6 +438,7 @@ async function abrirModalDetalle(id: number) {
             <thead>
               <tr>
                 <th>Artículo / Descripción</th>
+                <th>Lista de Precios</th>
                 <th class="text-center">Cant.</th>
                 <th class="text-right">P. Unitario</th>
                 <th class="text-right">Bonif.</th>
@@ -380,13 +451,14 @@ async function abrirModalDetalle(id: number) {
                   ? factura.detalles.map(d => `
                     <tr>
                       <td>${d.descripcion || d.listaPrecioArticulo?.articuloDenominacion || 'Item'}</td>
+                      <td>${d.listaPrecioArticulo?.listaPrecioDTO?.denominacion || d.listaPrecioArticulo?.listaPrecioDenominacion || '-'}</td>
                       <td class="text-center">${d.cantidad}</td>
                       <td class="text-right">${formatearMoneda(d.precioUnitario)}</td>
                       <td class="text-right">${d.porcentajeBonificacion}%</td>
                       <td class="text-right"><strong>${formatearMoneda(d.importeSubtotal)}</strong></td>
                     </tr>
                   `).join('')
-                  : `<tr><td colspan="5" class="text-center" style="color: var(--text-muted);">Sin ítems detallados.</td></tr>`
+                  : `<tr><td colspan="6" class="text-center" style="color: var(--text-muted);">Sin ítems detallados.</td></tr>`
               }
             </tbody>
           </table>
@@ -420,19 +492,29 @@ async function abrirModalEditar(id: number) {
   modalEditar.classList.remove('hidden');
 
   try {
-    const [factura, puntosVenta, clientes, condicionesIva, tiposMoneda, articulos] = await Promise.all([
+    const [factura, puntosVenta, clientes, condicionesIva, tiposMoneda, listasPrecio, articulos] = await Promise.all([
       obtenerFacturaPorId(id),
       obtenerPuntosVenta(),
       obtenerClientes(),
       obtenerCondicionesIva(),
       obtenerTiposMoneda(),
+      obtenerListasPrecio(),
       obtenerListasPrecioArticulos()
     ]);
 
     facturaEnEdicion = factura;
+    const tieneCae = Boolean(factura.cae && factura.cae.trim() !== '');
+    if (btnModalAnular) {
+      btnModalAnular.style.display = tieneCae ? '' : 'none';
+    }
+    if (btnModalBajaLogica) {
+      btnModalBajaLogica.style.display = tieneCae ? 'none' : '';
+    }
     modalEditarTitulo.textContent = (factura.numero != null && factura.numero > 0)
       ? `Modificar Factura #${factura.numero}`
       : `Modificar Factura (Pendiente AFIP)`;
+    listasPrecioMaestras = listasPrecio;
+    listaPrecioEdicionId = null;
     articulosMaestros = articulos;
     modificarDetallesActivo = false;
 
@@ -440,10 +522,15 @@ async function abrirModalEditar(id: number) {
     detallesEnEdicion = (factura.detalles || []).map(d => {
       const precio = d.precioUnitario || d.listaPrecioArticulo?.precioVenta || 0;
       const calc = calcularValoresDetalle(d.cantidad, precio, d.porcentajeBonificacion);
+      const lpDto = d.listaPrecioArticulo?.listaPrecioDTO;
+      const lpNombre = lpDto
+        ? `[${lpDto.codigo}] ${lpDto.denominacion}`
+        : (d.listaPrecioArticulo?.listaPrecioDenominacion || '-');
       return {
         listaPrecioArticuloId: d.listaPrecioArticulo?.id || 0,
         codigo: d.listaPrecioArticulo?.articuloCodigo || '-',
         descripcion: d.descripcion || d.listaPrecioArticulo?.articuloDenominacion || '',
+        listaPrecioNombre: lpNombre,
         precioUnitario: precio,
         cantidad: d.cantidad,
         porcentajeBonificacion: d.porcentajeBonificacion,
@@ -454,6 +541,8 @@ async function abrirModalEditar(id: number) {
     });
 
     const fechaFormateada = factura.fechaEmision ? factura.fechaEmision.split('T')[0] : '';
+    const ahora = new Date();
+    const hoyMax = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}-${String(ahora.getDate()).padStart(2, '0')}`;
 
     modalEditarBody.innerHTML = `
       <!-- 1. Cabecera de Atributos -->
@@ -471,7 +560,7 @@ async function abrirModalEditar(id: number) {
 
         <div class="form-group">
           <label for="edit-fecha">Fecha de Emisión *</label>
-          <input type="date" id="edit-fecha" value="${fechaFormateada}" required />
+          <input type="date" id="edit-fecha" value="${fechaFormateada}" max="${hoyMax}" required />
         </div>
 
         <div class="form-group">
@@ -608,17 +697,32 @@ function renderizarSeccionDetallesEdicion() {
     totalFactura += d.importeSubtotal;
   });
 
+  const articulosFiltrados = listaPrecioEdicionId != null
+    ? articulosMaestros.filter(a => (a.listaPrecioDTO?.id ?? a.listaPrecioId) === listaPrecioEdicionId)
+    : articulosMaestros;
+
   contenedor.innerHTML = `
     <!-- Card para Agregar Renglón (Cómodo y sin desbordes) -->
     <div class="add-item-card" style="margin-bottom: 1rem;">
       <div class="add-item-row-top">
         <div class="form-group">
+          <label for="edit-select-lista-precio">Lista de Precios</label>
+          <select id="edit-select-lista-precio">
+            <option value="">Todas las listas...</option>
+            ${listasPrecioMaestras.map(lp => `
+              <option value="${lp.id}" ${listaPrecioEdicionId === lp.id ? 'selected' : ''}>[${lp.codigo}] ${lp.denominacion}</option>
+            `).join('')}
+          </select>
+        </div>
+
+        <div class="form-group">
           <label for="edit-select-producto">Artículo / Producto *</label>
           <select id="edit-select-producto">
             <option value="">Seleccione un artículo...</option>
-            ${articulosMaestros.map(a => `
-              <option value="${a.id}">[${a.articuloDTO?.codigo || a.articuloCodigo || 'ART'}] ${a.articuloDTO?.denominacion || a.articuloDenominacion || 'Artículo'} - ${formatearMoneda(a.precioVenta)}</option>
-            `).join('')}
+            ${articulosFiltrados.map(a => {
+              const lpTag = a.listaPrecioDTO?.denominacion || a.listaPrecioDenominacion || '';
+              return `<option value="${a.id}">[${a.articuloDTO?.codigo || a.articuloCodigo || 'ART'}] ${a.articuloDTO?.denominacion || a.articuloDenominacion || 'Artículo'}${lpTag ? ` (${lpTag})` : ''} - ${formatearMoneda(a.precioVenta)}</option>`;
+            }).join('')}
           </select>
         </div>
 
@@ -654,6 +758,7 @@ function renderizarSeccionDetallesEdicion() {
           <tr>
             <th>Código</th>
             <th>Artículo / Descripción</th>
+            <th>Lista de Precios</th>
             <th class="text-right">Precio</th>
             <th class="text-center">Cant.</th>
             <th class="text-right">Desc %</th>
@@ -668,6 +773,7 @@ function renderizarSeccionDetallesEdicion() {
                 <tr>
                   <td><code>${item.codigo}</code></td>
                   <td><strong>${item.descripcion}</strong></td>
+                  <td><span class="badge-estado" style="background: var(--bg-subtle); color: var(--text-main); text-transform: none;">${item.listaPrecioNombre}</span></td>
                   <td class="text-right">${formatearMoneda(item.precioUnitario)}</td>
                   <td class="text-center">${item.cantidad}</td>
                   <td class="text-right">${item.porcentajeBonificacion}%</td>
@@ -679,7 +785,7 @@ function renderizarSeccionDetallesEdicion() {
                   </td>
                 </tr>
               `).join('')
-              : `<tr><td colspan="7" class="text-center py-3" style="color: var(--text-muted);">No hay ítems en la lista.</td></tr>`
+              : `<tr><td colspan="8" class="text-center py-3" style="color: var(--text-muted);">No hay ítems en la lista.</td></tr>`
           }
         </tbody>
       </table>
@@ -702,9 +808,15 @@ function renderizarSeccionDetallesEdicion() {
     </div>
   `;
 
-  // Autocompletar precio al seleccionar artículo en el modal
+  // Filtrar artículos por lista de precios seleccionada y autocompletar precio
+  const editSelectListaPrecio = document.getElementById('edit-select-lista-precio') as HTMLSelectElement;
   const editSelectProd = document.getElementById('edit-select-producto') as HTMLSelectElement;
   const editInputPrecio = document.getElementById('edit-input-precio') as HTMLInputElement;
+
+  editSelectListaPrecio.addEventListener('change', () => {
+    listaPrecioEdicionId = editSelectListaPrecio.value ? Number(editSelectListaPrecio.value) : null;
+    renderizarSeccionDetallesEdicion();
+  });
 
   editSelectProd.addEventListener('change', () => {
     const selId = Number(editSelectProd.value);
@@ -741,10 +853,16 @@ function renderizarSeccionDetallesEdicion() {
 
     const calc = calcularValoresDetalle(cant, art.precioVenta, bonif);
 
+    const lpDto = art.listaPrecioDTO;
+    const lpNombre = lpDto
+      ? `[${lpDto.codigo}] ${lpDto.denominacion}`
+      : (art.listaPrecioDenominacion || '-');
+
     detallesEnEdicion.push({
       listaPrecioArticuloId: art.id,
       codigo: art.articuloDTO?.codigo || art.articuloCodigo || 'ART',
       descripcion: art.articuloDTO?.denominacion || art.articuloDenominacion || 'Artículo',
+      listaPrecioNombre: lpNombre,
       precioUnitario: art.precioVenta,
       cantidad: cant,
       porcentajeBonificacion: bonif,
@@ -798,6 +916,12 @@ formEditarFactura.addEventListener('submit', async (e) => {
 
   // 2. Fecha de Emisión
   const fechaVal = (document.getElementById('edit-fecha') as HTMLInputElement).value;
+  const ahora = new Date();
+  const hoyLocal = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}-${String(ahora.getDate()).padStart(2, '0')}`;
+  if (fechaVal && fechaVal > hoyLocal) {
+    alert('No se puede guardar una factura con fecha futura.');
+    return;
+  }
   const originalFechaStr = facturaEnEdicion.fechaEmision ? facturaEnEdicion.fechaEmision.split('T')[0] : '';
   if (fechaVal && fechaVal !== originalFechaStr) {
     editPayload.fechaEmision = new Date(`${fechaVal}T12:00:00`).toISOString();

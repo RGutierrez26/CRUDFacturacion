@@ -403,6 +403,17 @@ a {
   color: #ffffff;
 }
 
+.btn-anular {
+  background: var(--warning-light);
+  color: var(--warning);
+  border-color: rgba(217, 119, 6, 0.25);
+}
+
+.btn-anular:hover {
+  background: var(--warning);
+  color: #ffffff;
+}
+
 .btn-action:disabled {
   opacity: 0.45;
   cursor: not-allowed;
