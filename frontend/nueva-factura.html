@@ -183,6 +183,7 @@
                   <tr>
                     <th>Código</th>
                     <th>Artículo / Descripción</th>
+                    <th>Lista de Precios</th>
                     <th class="text-right">Precio Unit.</th>
                     <th class="text-center">Cant.</th>
                     <th class="text-right">Desc %</th>
@@ -194,7 +195,7 @@
                 </thead>
                 <tbody id="tabla-detalles-body">
                   <tr>
-                    <td colspan="9" class="text-center py-4" style="color: var(--text-muted);">
+                    <td colspan="10" class="text-center py-4" style="color: var(--text-muted);">
                       Aún no agregaste productos a la factura.
                     </td>
                   </tr>
@@ -262,11 +263,7 @@
         </div>
         <footer class="modal-footer">
           <div class="modal-actions-bar">
-            <div class="modal-actions-left">
-              <button type="button" id="modal-selector-btn-opcional" class="btn btn-secondary hidden">
-                Sin Cliente (Consumidor Final)
-              </button>
-            </div>
+            <div class="modal-actions-left"></div>
             <div class="modal-actions-right">
               <button type="button" id="modal-selector-btn-cancelar" class="btn btn-secondary">Cancelar</button>
               <button type="button" id="modal-selector-btn-aceptar" class="btn btn-primary" disabled>

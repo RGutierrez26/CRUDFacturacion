@@ -23,6 +23,7 @@ import type {
 interface ItemDetalleDisplay extends FacturaDetalleRequestDTO {
   codigoArticulo: string;
   denominacionArticulo: string;
+  listaPrecioNombre: string;
   importeNeto: number;
   importeIva: number;
   importeSubtotal: number;
@@ -87,7 +88,6 @@ const modalSelectorBusqueda = document.getElementById('modal-selector-busqueda')
 const modalSelectorLista = document.getElementById('modal-selector-lista') as HTMLDivElement;
 const modalSelectorPreviewContent = document.getElementById('modal-selector-preview-content') as HTMLDivElement;
 const modalSelectorPreviewBadge = document.getElementById('modal-selector-preview-badge') as HTMLSpanElement;
-const modalSelectorBtnOpcional = document.getElementById('modal-selector-btn-opcional') as HTMLButtonElement;
 const modalSelectorBtnCancelar = document.getElementById('modal-selector-btn-cancelar') as HTMLButtonElement;
 const modalSelectorBtnAceptar = document.getElementById('modal-selector-btn-aceptar') as HTMLButtonElement;
 
@@ -147,7 +147,6 @@ function abrirModalCargando(titulo: string) {
   modalSelectorTitulo.textContent = titulo;
   modalSelectorBusqueda.value = '';
   modalSelectorBtnAceptar.disabled = true;
-  modalSelectorBtnOpcional.classList.add('hidden');
   modalSelectorPreviewBadge.textContent = 'Consultando BD';
   modalSelectorLista.innerHTML = `
     <div style="padding: 3rem 1rem; text-align: center; color: var(--text-muted);">
@@ -167,15 +166,11 @@ function configurarModalSelector<T>({
   titulo,
   opciones,
   idSeleccionadoActual,
-  textoBotonOpcional,
-  onOpcional,
   onAceptar
 }: {
   titulo: string;
   opciones: OpcionSelector<T>[];
   idSeleccionadoActual?: string | number | null;
-  textoBotonOpcional?: string;
-  onOpcional?: () => void;
   onAceptar: (item: T) => void;
 }) {
   modalSelectorTitulo.textContent = titulo;
@@ -183,19 +178,6 @@ function configurarModalSelector<T>({
   onAceptarCallback = onAceptar;
   opcionPreseleccionada = null;
   modalSelectorBtnAceptar.disabled = true;
-
-  // Botón opcional (ej: Consumidor Final)
-  if (textoBotonOpcional && onOpcional) {
-    modalSelectorBtnOpcional.textContent = textoBotonOpcional;
-    modalSelectorBtnOpcional.classList.remove('hidden');
-    modalSelectorBtnOpcional.onclick = () => {
-      onOpcional();
-      cerrarModalSelector();
-    };
-  } else {
-    modalSelectorBtnOpcional.classList.add('hidden');
-    modalSelectorBtnOpcional.onclick = null;
-  }
 
   // Preseleccionar actual si existe
   if (idSeleccionadoActual != null) {
@@ -420,15 +402,6 @@ btnSelectCliente.addEventListener('click', async () => {
       titulo: 'Seleccionar Cliente',
       opciones,
       idSeleccionadoActual: clienteSeleccionado?.id,
-      textoBotonOpcional: 'Consumidor Final (Sin Cliente)',
-      onOpcional: () => {
-        clienteSeleccionado = null;
-        esConsumidorFinal = true;
-        cardClienteDesc.textContent = 'Consumidor Final';
-        cardClienteSub.textContent = 'Sin CUIT/CUIL asociado (Venta a Consumidor Final)';
-        badgeCliente.textContent = 'Consumidor Final';
-        badgeCliente.className = 'entity-card-badge badge-selected';
-      },
       onAceptar: (cli: ClienteDTO) => {
         clienteSeleccionado = cli;
         esConsumidorFinal = false;
@@ -579,16 +552,7 @@ btnSelectListaPrecio.addEventListener('click', async () => {
       opciones,
       idSeleccionadoActual: listaPrecioSeleccionada?.id,
       onAceptar: async (lp: ListaPrecioDTO) => {
-        // Si ya habían ítems y se cambia la lista de precios, advertir y limpiar
-        if (detallesCargados.length > 0 && listaPrecioSeleccionada && listaPrecioSeleccionada.id !== lp.id) {
-          const confirma = confirm(
-            'Al cambiar la Lista de Precios se removerán los artículos agregados con la lista anterior.\n¿Desea continuar?'
-          );
-          if (!confirma) return;
-          detallesCargados.length = 0;
-          actualizarTablaYResumen();
-        }
-
+        // Permitir cambiar de Lista de Precios conservando los renglones ya agregados
         listaPrecioSeleccionada = lp;
         cardListaPrecioDesc.textContent = `[${lp.codigo}] ${lp.denominacion}`;
         cardListaPrecioSub.textContent = `ID #${lp.id} - Lista activa para cotización de artículos`;
@@ -724,10 +688,15 @@ btnAgregarItem.addEventListener('click', () => {
   const cod = obtenerArticuloCodigo(articuloSeleccionadoParaItem);
   const desc = obtenerArticuloDenominacion(articuloSeleccionadoParaItem);
 
+  const listaNombre = listaPrecioSeleccionada
+    ? `[${listaPrecioSeleccionada.codigo}] ${listaPrecioSeleccionada.denominacion}`
+    : (articuloSeleccionadoParaItem.listaPrecioDTO?.denominacion || articuloSeleccionadoParaItem.listaPrecioDenominacion || '-');
+
   detallesCargados.push({
     listaPrecioArticuloId: articuloSeleccionadoParaItem.id,
     codigoArticulo: cod,
     denominacionArticulo: desc,
+    listaPrecioNombre: listaNombre,
     descripcion: desc,
     precioUnitario: precioUnitario,
     cantidad: cantidad,
@@ -752,7 +721,7 @@ function actualizarTablaYResumen() {
   if (detallesCargados.length === 0) {
     tbodyDetalles.innerHTML = `
       <tr>
-        <td colspan="9" class="text-center py-4" style="color: var(--text-muted);">
+        <td colspan="10" class="text-center py-4" style="color: var(--text-muted);">
           Aún no agregaste productos a la factura.
         </td>
       </tr>
@@ -776,6 +745,7 @@ function actualizarTablaYResumen() {
       <tr>
         <td><strong>${item.codigoArticulo}</strong></td>
         <td>${item.denominacionArticulo}</td>
+        <td><span class="badge-estado" style="background: var(--bg-subtle); color: var(--text-main); text-transform: none;">${item.listaPrecioNombre}</span></td>
         <td class="text-right">${formatearMoneda(item.precioUnitario)}</td>
         <td class="text-center">${item.cantidad}</td>
         <td class="text-right">${item.porcentajeBonificacion}%</td>
@@ -841,6 +811,12 @@ formNuevaFactura.addEventListener('submit', async (e) => {
     return;
   }
 
+  const hoyLocal = obtenerHoyLocal();
+  if (!inputFechaEmision.value || inputFechaEmision.value > hoyLocal) {
+    alert('No se puede cargar una factura con fecha futura.');
+    return;
+  }
+
   // Armar payload garantizando los IDs de los objetos subyacentes
   const payload: FacturaRequestDTO = {
     puntoVentaId: Number(puntoVentaSeleccionado.id),
@@ -880,9 +856,18 @@ formNuevaFactura.addEventListener('submit', async (e) => {
 // ===================================================
 // Inicialización Básica de UI (Sin peticiones a la BD)
 // ===================================================
+function obtenerHoyLocal(): string {
+  const ahora = new Date();
+  const anio = ahora.getFullYear();
+  const mes = String(ahora.getMonth() + 1).padStart(2, '0');
+  const dia = String(ahora.getDate()).padStart(2, '0');
+  return `${anio}-${mes}-${dia}`;
+}
+
 function inicializarFormulario() {
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = obtenerHoyLocal();
   inputFechaEmision.value = hoy;
+  inputFechaEmision.max = hoy;
 
   // Tarjetas inician en estado limpio, sin consultas previas a la BD
   cardPuntoVentaDesc.textContent = 'Sin seleccionar';
